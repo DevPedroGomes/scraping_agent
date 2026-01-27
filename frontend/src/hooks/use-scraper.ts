@@ -79,7 +79,7 @@ export function useScraper() {
 
       return response;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(errorMessage);
       return null;
     } finally {

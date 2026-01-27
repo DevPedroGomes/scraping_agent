@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, HttpUrl
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -36,10 +36,10 @@ class OutputField(BaseModel):
 
 
 class ScrapeRequest(BaseModel):
-    url: str = Field(..., description="URL do site a ser raspado")
-    prompt: str = Field(..., description="O que você deseja extrair do site")
-    model: ModelType = Field(default=ModelType.GPT_4O_MINI, description="Modelo LLM a ser usado")
-    api_key: str | None = Field(default=None, description="OpenAI API Key (opcional se configurado no servidor)")
+    url: str = Field(..., description="URL of the website to scrape")
+    prompt: str = Field(..., description="What you want to extract from the website")
+    model: ModelType = Field(default=ModelType.GPT_4O_MINI, description="LLM model to use")
+    api_key: str | None = Field(default=None, description="OpenAI API Key (optional if configured on server)")
 
     # Structured Output
     output_schema: list[OutputField] | None = Field(
@@ -63,7 +63,7 @@ class ScrapeResponse(BaseModel):
     data: Any | None = None
     error: str | None = None
     execution_time: float
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Cache info
     cache_hit: bool = Field(default=False, description="Whether page content was served from cache")

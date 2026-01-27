@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 from uuid import uuid4
 from cachetools import TTLCache
@@ -30,14 +30,15 @@ class SessionManager:
             self._cleanup_oldest_session()
 
         session_id = str(uuid4())
+        now = datetime.now(timezone.utc)
         self._sessions[session_id] = {
-            "created_at": datetime.utcnow(),
-            "last_activity": datetime.utcnow(),
+            "created_at": now,
+            "last_activity": now,
             "requests_count": 0
         }
         self._locks[session_id] = asyncio.Lock()
         self._request_counts[session_id] = 0
-        self._last_requests[session_id] = datetime.utcnow()
+        self._last_requests[session_id] = now
 
         return session_id
 
@@ -46,7 +47,7 @@ class SessionManager:
 
     def update_session_activity(self, session_id: str) -> bool:
         if session_id in self._sessions:
-            self._sessions[session_id]["last_activity"] = datetime.utcnow()
+            self._sessions[session_id]["last_activity"] = datetime.now(timezone.utc)
             self._sessions[session_id]["requests_count"] += 1
             return True
         return False
@@ -65,7 +66,7 @@ class SessionManager:
 
     def can_make_request(self, session_id: str) -> bool:
         settings = get_settings()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if session_id not in self._last_requests:
             return True
@@ -83,7 +84,7 @@ class SessionManager:
         return True
 
     def record_request(self, session_id: str):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         last_request = self._last_requests.get(session_id)
 
         if last_request and (now - last_request).total_seconds() >= 60:

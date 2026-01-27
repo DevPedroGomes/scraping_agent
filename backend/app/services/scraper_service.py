@@ -3,7 +3,7 @@ import hashlib
 import time
 import json
 from typing import Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from cachetools import TTLCache
 from scrapegraphai.graphs import SmartScraperGraph
 from playwright.async_api import async_playwright
@@ -43,7 +43,7 @@ class PageCache:
         self._cache[key] = content
         self._metadata[key] = {
             "url": url,
-            "cached_at": datetime.utcnow(),
+            "cached_at": datetime.now(timezone.utc),
             "ttl": ttl or 3600
         }
 
