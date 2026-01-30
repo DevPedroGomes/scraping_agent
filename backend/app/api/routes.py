@@ -7,7 +7,12 @@ from app.models.schemas import (
     HealthResponse,
     ErrorResponse,
     ModelsResponse,
-    DeleteSessionResponse
+    ModelInfo,
+    DeleteSessionResponse,
+    ModelType,
+    ModelProvider,
+    MODEL_PROVIDER_MAP,
+    MODEL_PRICING,
 )
 from app.core.session_manager import session_manager
 from app.services.scraper_service import scraper_service
@@ -149,13 +154,18 @@ Extract structured data from any website using AI.
 
 **Rate Limit**: 10 requests per minute per session.
 
+**Providers**: OpenAI, DeepSeek, Gemini, Anthropic, Grok
+
 **Features**:
-- AI-powered data extraction using OpenAI models
+- Multi-provider AI extraction (5 providers, 15+ models)
+- HTML to Markdown conversion (67% token reduction)
+- Playwright stealth mode (anti-bot detection)
+- Smart model routing by cost tier
 - Page actions (click, scroll, wait, type) before scraping
 - Structured output with schema validation
 - Page content caching to reduce costs
 
-**Required**: OpenAI API key (passed in request body)
+**Required**: API key for your chosen provider (passed in request body)
     """,
     responses={
         429: {
@@ -185,8 +195,11 @@ async def scrape_website(
 
     - **url**: Target website URL
     - **prompt**: What data to extract (natural language)
-    - **model**: OpenAI model to use
-    - **api_key**: Your OpenAI API key
+    - **model**: AI model to use (default: deepseek-v3)
+    - **api_key**: API key for the selected model's provider
+    - **cost_tier**: Auto-select model by cost tier (budget/standard/premium)
+    - **stealth_mode**: Use anti-bot detection bypass (default: true)
+    - **use_markdown**: Convert HTML to Markdown to reduce tokens (default: true)
     - **actions**: Optional page actions before scraping
     - **output_schema**: Optional schema for structured output
     - **use_cache**: Use cached page content (default: true)
@@ -210,16 +223,58 @@ async def scrape_website(
     "/models",
     response_model=ModelsResponse,
     summary="List Models",
-    description="Get list of available OpenAI models for scraping."
+    description="""Get list of all available AI models for scraping across all providers.
+
+**Providers**: OpenAI, DeepSeek, Gemini, Anthropic, Grok
+
+**Cost Tiers**:
+- Budget: Cheapest options ($0.05-$0.30 per 1M input tokens)
+- Standard: Balanced cost/performance ($0.25-$1.00 per 1M input tokens)
+- Premium: Best performance ($1.25-$5.00 per 1M input tokens)
+    """
 )
 async def get_available_models():
-    """Returns all available OpenAI models."""
-    return ModelsResponse(
-        models=[
-            {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and economical"},
-            {"id": "gpt-4o", "name": "GPT-4o", "description": "More accurate, multimodal"},
-            {"id": "gpt-4-turbo", "name": "GPT-4 Turbo", "description": "High performance"},
-            {"id": "gpt-4", "name": "GPT-4", "description": "Robust model"},
-            {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "description": "Economical"},
-        ]
-    )
+    """Returns all available AI models across all providers."""
+    models = []
+
+    # Model display names and descriptions
+    model_info = {
+        # DeepSeek
+        ModelType.DEEPSEEK_CHAT: ("DeepSeek Chat", "Cheapest option - Great for simple extractions"),
+        ModelType.DEEPSEEK_V3: ("DeepSeek V3", "Best value - 95% GPT-4 quality at 5% cost"),
+        # Gemini
+        ModelType.GEMINI_FLASH_LITE: ("Gemini Flash Lite", "Ultra-fast and cheap - Good for large pages"),
+        ModelType.GEMINI_FLASH: ("Gemini 2.5 Flash", "Fast with 1M context window"),
+        ModelType.GEMINI_PRO: ("Gemini 2.5 Pro", "Most capable Gemini model"),
+        # OpenAI GPT-5
+        ModelType.GPT_5_NANO: ("GPT-5 Nano", "Fastest OpenAI model - Great for simple tasks"),
+        ModelType.GPT_5_MINI: ("GPT-5 Mini", "Balanced speed and intelligence"),
+        ModelType.GPT_5: ("GPT-5", "Most intelligent OpenAI model"),
+        # OpenAI Legacy
+        ModelType.GPT_4O_MINI: ("GPT-4o Mini (Legacy)", "Fast and economical - Previous gen"),
+        ModelType.GPT_4O: ("GPT-4o (Legacy)", "Multimodal - Previous gen"),
+        # Anthropic
+        ModelType.CLAUDE_HAIKU: ("Claude Haiku 4.5", "Fastest Claude - Great for structured output"),
+        ModelType.CLAUDE_SONNET: ("Claude Sonnet 4.5", "Balanced Claude model"),
+        ModelType.CLAUDE_OPUS: ("Claude Opus 4.5", "Most capable Claude model"),
+        # Grok
+        ModelType.GROK_FAST: ("Grok 4 Fast", "Fast with 2M context window"),
+        ModelType.GROK_4: ("Grok 4", "Most capable xAI model - 2M context"),
+    }
+
+    for model_type in ModelType:
+        provider = MODEL_PROVIDER_MAP.get(model_type)
+        pricing = MODEL_PRICING.get(model_type, {"input": 0, "output": 0, "tier": "standard"})
+        name, description = model_info.get(model_type, (model_type.value, "AI model"))
+
+        models.append(ModelInfo(
+            id=model_type.value,
+            name=name,
+            provider=provider.value if provider else "unknown",
+            description=description,
+            tier=pricing["tier"],
+            input_price=pricing["input"],
+            output_price=pricing["output"]
+        ))
+
+    return ModelsResponse(models=models, default_model="deepseek-v3")

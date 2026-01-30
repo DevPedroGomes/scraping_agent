@@ -32,10 +32,10 @@ export default function Home() {
               Built with{" "}
               <span className="font-medium text-foreground">Next.js</span>,{" "}
               <span className="font-medium text-foreground">FastAPI</span> and{" "}
-              <span className="font-medium text-foreground">ScrapeGraphAI</span>
+              <span className="font-medium text-foreground">Playwright</span>
             </p>
             <p className="text-xs">
-              AI Engineering and Full-Stack Development Showcase
+              Multi-Provider AI (OpenAI, DeepSeek, Gemini, Claude, Grok) | 67% Token Reduction | Stealth Mode
             </p>
           </div>
         </footer>

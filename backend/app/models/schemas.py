@@ -1,16 +1,90 @@
-from pydantic import BaseModel, Field, HttpUrl, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Any
 from datetime import datetime, timezone
 from enum import Enum
 
 
+class ModelProvider(str, Enum):
+    """AI Provider for LLM inference."""
+    OPENAI = "openai"
+    DEEPSEEK = "deepseek"
+    GEMINI = "gemini"
+    ANTHROPIC = "anthropic"
+    GROK = "grok"
+
+
 class ModelType(str, Enum):
-    """Available OpenAI models for scraping."""
-    GPT_35_TURBO = "gpt-3.5-turbo"
-    GPT_4 = "gpt-4"
-    GPT_4_TURBO = "gpt-4-turbo"
-    GPT_4O = "gpt-4o"
-    GPT_4O_MINI = "gpt-4o-mini"
+    """Available models across all providers."""
+    # DeepSeek (CHEAPEST - Best value)
+    DEEPSEEK_CHAT = "deepseek-chat"          # $0.14/$0.28 per 1M tokens
+    DEEPSEEK_V3 = "deepseek-v3"              # $0.27/$1.10 per 1M tokens
+
+    # Gemini (CHEAP + Large context)
+    GEMINI_FLASH_LITE = "gemini-2.5-flash-lite"  # $0.10/$0.40 per 1M tokens
+    GEMINI_FLASH = "gemini-2.5-flash"            # $0.30/$2.50 per 1M tokens
+    GEMINI_PRO = "gemini-2.5-pro"                # $1.25/$2.50 per 1M tokens
+
+    # OpenAI GPT-5 (PREMIUM)
+    GPT_5_NANO = "gpt-5-nano"                # $0.05/$0.40 per 1M tokens
+    GPT_5_MINI = "gpt-5-mini"                # $0.25/$2.00 per 1M tokens
+    GPT_5 = "gpt-5"                          # $1.25/$10.00 per 1M tokens
+
+    # OpenAI Legacy (for compatibility)
+    GPT_4O_MINI = "gpt-4o-mini"              # Legacy
+    GPT_4O = "gpt-4o"                        # Legacy
+
+    # Anthropic Claude (Excellent structured output)
+    CLAUDE_HAIKU = "claude-haiku-4.5"        # $1.00/$5.00 per 1M tokens
+    CLAUDE_SONNET = "claude-sonnet-4.5"      # $3.00/$15.00 per 1M tokens
+    CLAUDE_OPUS = "claude-opus-4.5"          # $5.00/$25.00 per 1M tokens
+
+    # xAI Grok (2M context window)
+    GROK_FAST = "grok-4-fast"                # $0.20/$0.50 per 1M tokens
+    GROK_4 = "grok-4"                        # $3.00/$15.00 per 1M tokens
+
+
+# Model to Provider mapping
+MODEL_PROVIDER_MAP = {
+    # DeepSeek
+    ModelType.DEEPSEEK_CHAT: ModelProvider.DEEPSEEK,
+    ModelType.DEEPSEEK_V3: ModelProvider.DEEPSEEK,
+    # Gemini
+    ModelType.GEMINI_FLASH_LITE: ModelProvider.GEMINI,
+    ModelType.GEMINI_FLASH: ModelProvider.GEMINI,
+    ModelType.GEMINI_PRO: ModelProvider.GEMINI,
+    # OpenAI
+    ModelType.GPT_5_NANO: ModelProvider.OPENAI,
+    ModelType.GPT_5_MINI: ModelProvider.OPENAI,
+    ModelType.GPT_5: ModelProvider.OPENAI,
+    ModelType.GPT_4O_MINI: ModelProvider.OPENAI,
+    ModelType.GPT_4O: ModelProvider.OPENAI,
+    # Anthropic
+    ModelType.CLAUDE_HAIKU: ModelProvider.ANTHROPIC,
+    ModelType.CLAUDE_SONNET: ModelProvider.ANTHROPIC,
+    ModelType.CLAUDE_OPUS: ModelProvider.ANTHROPIC,
+    # Grok
+    ModelType.GROK_FAST: ModelProvider.GROK,
+    ModelType.GROK_4: ModelProvider.GROK,
+}
+
+# Model pricing info (input/output per 1M tokens)
+MODEL_PRICING = {
+    ModelType.DEEPSEEK_CHAT: {"input": 0.14, "output": 0.28, "tier": "budget"},
+    ModelType.DEEPSEEK_V3: {"input": 0.27, "output": 1.10, "tier": "budget"},
+    ModelType.GEMINI_FLASH_LITE: {"input": 0.10, "output": 0.40, "tier": "budget"},
+    ModelType.GEMINI_FLASH: {"input": 0.30, "output": 2.50, "tier": "standard"},
+    ModelType.GEMINI_PRO: {"input": 1.25, "output": 2.50, "tier": "premium"},
+    ModelType.GPT_5_NANO: {"input": 0.05, "output": 0.40, "tier": "budget"},
+    ModelType.GPT_5_MINI: {"input": 0.25, "output": 2.00, "tier": "standard"},
+    ModelType.GPT_5: {"input": 1.25, "output": 10.00, "tier": "premium"},
+    ModelType.GPT_4O_MINI: {"input": 0.15, "output": 0.60, "tier": "budget"},
+    ModelType.GPT_4O: {"input": 2.50, "output": 10.00, "tier": "premium"},
+    ModelType.CLAUDE_HAIKU: {"input": 1.00, "output": 5.00, "tier": "standard"},
+    ModelType.CLAUDE_SONNET: {"input": 3.00, "output": 15.00, "tier": "premium"},
+    ModelType.CLAUDE_OPUS: {"input": 5.00, "output": 25.00, "tier": "premium"},
+    ModelType.GROK_FAST: {"input": 0.20, "output": 0.50, "tier": "budget"},
+    ModelType.GROK_4: {"input": 3.00, "output": 15.00, "tier": "premium"},
+}
 
 
 class ActionType(str, Enum):
@@ -19,6 +93,13 @@ class ActionType(str, Enum):
     SCROLL = "scroll"
     WAIT = "wait"
     TYPE = "type"
+
+
+class CostTier(str, Enum):
+    """Cost tier for smart routing."""
+    BUDGET = "budget"      # Cheapest models
+    STANDARD = "standard"  # Balanced cost/performance
+    PREMIUM = "premium"    # Best performance
 
 
 class PageAction(BaseModel):
@@ -81,13 +162,21 @@ class ScrapeRequest(BaseModel):
         json_schema_extra={"example": "Extract the main heading and all paragraph texts"}
     )
     model: ModelType = Field(
-        default=ModelType.GPT_4O_MINI,
-        description="LLM model to use for extraction"
+        default=ModelType.DEEPSEEK_V3,
+        description="LLM model to use for extraction (default: DeepSeek V3 - best value)"
     )
+
+    # API Keys per provider (user provides their own)
     api_key: str | None = Field(
         default=None,
-        description="OpenAI API Key (required unless server has default key)",
+        description="API Key for the selected model's provider",
         json_schema_extra={"example": "sk-..."}
+    )
+
+    # Smart routing
+    cost_tier: CostTier | None = Field(
+        default=None,
+        description="Cost tier for automatic model selection (overrides model if set)"
     )
 
     # Structured Output
@@ -114,14 +203,28 @@ class ScrapeRequest(BaseModel):
         le=1440
     )
 
+    # Stealth mode
+    stealth_mode: bool = Field(
+        default=True,
+        description="Use stealth mode to avoid bot detection"
+    )
+
+    # Markdown conversion
+    use_markdown: bool = Field(
+        default=True,
+        description="Convert HTML to Markdown before LLM (reduces tokens by ~67%)"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "url": "https://example.com",
                 "prompt": "Extract the main heading text",
-                "model": "gpt-4o-mini",
+                "model": "deepseek-v3",
                 "api_key": "sk-...",
-                "use_cache": True
+                "use_cache": True,
+                "stealth_mode": True,
+                "use_markdown": True
             }
         }
     )
@@ -135,10 +238,28 @@ class ScrapeResponse(BaseModel):
     execution_time: float = Field(..., description="Time taken in seconds")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    # Model info
+    model_used: str | None = Field(default=None, description="Actual model used for extraction")
+    provider_used: str | None = Field(default=None, description="Provider used")
+
+    # Token usage
+    tokens_used: int | None = Field(default=None, description="Approximate tokens used")
+    estimated_cost: float | None = Field(default=None, description="Estimated cost in USD")
+
     # Cache info
     cache_hit: bool = Field(
         default=False,
         description="Whether page content was served from cache"
+    )
+
+    # Markdown conversion
+    markdown_used: bool = Field(
+        default=False,
+        description="Whether HTML was converted to Markdown"
+    )
+    token_reduction: float | None = Field(
+        default=None,
+        description="Token reduction percentage from Markdown conversion"
     )
 
     # Validation info
@@ -165,7 +286,13 @@ class ScrapeResponse(BaseModel):
                 "error": None,
                 "execution_time": 2.35,
                 "timestamp": "2024-01-27T15:30:00Z",
+                "model_used": "deepseek-v3",
+                "provider_used": "deepseek",
+                "tokens_used": 1500,
+                "estimated_cost": 0.002,
                 "cache_hit": False,
+                "markdown_used": True,
+                "token_reduction": 67.5,
                 "validation_passed": None,
                 "validation_errors": None,
                 "actions_executed": 0
@@ -198,7 +325,11 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="Health status", json_schema_extra={"example": "healthy"})
     active_sessions: int = Field(..., description="Number of active sessions")
     max_sessions: int = Field(..., description="Maximum allowed sessions")
-    version: str = Field(default="2.0.0", description="API version")
+    version: str = Field(default="3.0.0", description="API version")
+    features: list[str] = Field(
+        default=["multi-provider", "smart-routing", "stealth-mode", "markdown-conversion"],
+        description="Enabled features"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -206,7 +337,8 @@ class HealthResponse(BaseModel):
                 "status": "healthy",
                 "active_sessions": 5,
                 "max_sessions": 35,
-                "version": "2.0.0"
+                "version": "3.0.0",
+                "features": ["multi-provider", "smart-routing", "stealth-mode", "markdown-conversion"]
             }
         }
     )
@@ -231,20 +363,33 @@ class ModelInfo(BaseModel):
     """Information about an available model."""
     id: str = Field(..., description="Model identifier")
     name: str = Field(..., description="Display name")
+    provider: str = Field(..., description="Provider name")
     description: str = Field(..., description="Model description")
+    tier: str = Field(..., description="Cost tier: budget, standard, premium")
+    input_price: float = Field(..., description="Price per 1M input tokens")
+    output_price: float = Field(..., description="Price per 1M output tokens")
 
 
 class ModelsResponse(BaseModel):
     """Response listing available models."""
     models: list[ModelInfo] = Field(..., description="List of available models")
+    default_model: str = Field(default="deepseek-v3", description="Default recommended model")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "models": [
-                    {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and economical"},
-                    {"id": "gpt-4o", "name": "GPT-4o", "description": "More accurate, multimodal"}
-                ]
+                    {
+                        "id": "deepseek-v3",
+                        "name": "DeepSeek V3",
+                        "provider": "deepseek",
+                        "description": "Best value - 95% GPT-4 quality at 5% cost",
+                        "tier": "budget",
+                        "input_price": 0.27,
+                        "output_price": 1.10
+                    }
+                ],
+                "default_model": "deepseek-v3"
             }
         }
     )

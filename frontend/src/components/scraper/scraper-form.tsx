@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +11,22 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { Model, ModelType, ScrapeRequest, PageAction, OutputField, ActionType } from "@/types";
+import type {
+  Model,
+  ModelType,
+  ModelProvider,
+  CostTier,
+  ScrapeRequest,
+  PageAction,
+  OutputField,
+  ActionType,
+} from "@/types";
+import { MODEL_TO_PROVIDER, PROVIDER_API_KEY_LABELS, PROVIDER_NAMES } from "@/types";
 
 interface ScraperFormProps {
   models: Model[];
@@ -25,9 +37,14 @@ interface ScraperFormProps {
 export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
   const [url, setUrl] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<ModelType>("gpt-4o-mini");
+  const [model, setModel] = useState<ModelType>("deepseek-v3");
   const [apiKey, setApiKey] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // New options
+  const [stealthMode, setStealthMode] = useState(true);
+  const [useMarkdown, setUseMarkdown] = useState(true);
+  const [costTier, setCostTier] = useState<CostTier | "">("");
 
   // Advanced options
   const [useCache, setUseCache] = useState(true);
@@ -50,6 +67,27 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
     required: true,
   });
 
+  // Get current provider from selected model
+  const currentProvider: ModelProvider = MODEL_TO_PROVIDER[model] || "deepseek";
+
+  // Group models by provider
+  const modelsByProvider = useMemo(() => {
+    const grouped: Record<string, Model[]> = {};
+    models.forEach((m) => {
+      const provider = m.provider || "other";
+      if (!grouped[provider]) {
+        grouped[provider] = [];
+      }
+      grouped[provider].push(m);
+    });
+    return grouped;
+  }, [models]);
+
+  // Get selected model info
+  const selectedModel = useMemo(() => {
+    return models.find((m) => m.id === model);
+  }, [models, model]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -61,7 +99,14 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
       model,
       api_key: apiKey || undefined,
       use_cache: useCache,
+      stealth_mode: stealthMode,
+      use_markdown: useMarkdown,
     };
+
+    // If cost tier is selected, override model selection
+    if (costTier) {
+      request.cost_tier = costTier;
+    }
 
     if (actions.length > 0) {
       request.actions = actions;
@@ -98,6 +143,9 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
 
   const isValid = url.trim() !== "" && prompt.trim() !== "";
 
+  // Provider order for display
+  const providerOrder: ModelProvider[] = ["deepseek", "gemini", "openai", "anthropic", "grok"];
+
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-4">
@@ -108,12 +156,64 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Model Selection */}
           <div className="space-y-2">
-            <Label htmlFor="api-key">OpenAI API Key</Label>
+            <Label htmlFor="model">AI Model</Label>
+            <Select value={model} onValueChange={(v) => setModel(v as ModelType)}>
+              <SelectTrigger id="model">
+                <SelectValue placeholder="Select a model" />
+              </SelectTrigger>
+              <SelectContent>
+                {providerOrder.map((provider) => {
+                  const providerModels = modelsByProvider[provider];
+                  if (!providerModels || providerModels.length === 0) return null;
+
+                  return (
+                    <SelectGroup key={provider}>
+                      <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+                        {PROVIDER_NAMES[provider]}
+                      </SelectLabel>
+                      {providerModels.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          <span className="flex items-center gap-2">
+                            <span className="font-medium">{m.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ${m.input_price}/{m.output_price}
+                            </span>
+                            <Badge
+                              variant={
+                                m.tier === "budget"
+                                  ? "secondary"
+                                  : m.tier === "premium"
+                                  ? "default"
+                                  : "outline"
+                              }
+                              className="text-[10px] px-1"
+                            >
+                              {m.tier}
+                            </Badge>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {selectedModel && (
+              <p className="text-xs text-muted-foreground">
+                {selectedModel.description}
+              </p>
+            )}
+          </div>
+
+          {/* API Key - dynamic based on selected provider */}
+          <div className="space-y-2">
+            <Label htmlFor="api-key">{PROVIDER_API_KEY_LABELS[currentProvider]}</Label>
             <Input
               id="api-key"
               type="password"
-              placeholder="sk-..."
+              placeholder={currentProvider === "openai" ? "sk-..." : "Enter API key..."}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               className="font-mono text-sm"
@@ -121,25 +221,6 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             <p className="text-xs text-muted-foreground">
               Your key is not stored and is only used for this request
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="model">Model</Label>
-            <Select value={model} onValueChange={(v) => setModel(v as ModelType)}>
-              <SelectTrigger id="model">
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    <span className="font-medium">{m.name}</span>
-                    <span className="text-muted-foreground ml-2 text-xs">
-                      - {m.description}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
@@ -166,6 +247,46 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             />
           </div>
 
+          {/* Optimization Options */}
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="stealth-mode"
+                checked={stealthMode}
+                onChange={(e) => setStealthMode(e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="stealth-mode" className="text-sm font-normal cursor-pointer">
+                Stealth Mode
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="use-markdown"
+                checked={useMarkdown}
+                onChange={(e) => setUseMarkdown(e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="use-markdown" className="text-sm font-normal cursor-pointer">
+                Markdown (~67% cheaper)
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="use-cache"
+                checked={useCache}
+                onChange={(e) => setUseCache(e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="use-cache" className="text-sm font-normal cursor-pointer">
+                Use Cache
+              </Label>
+            </div>
+          </div>
+
           {/* Advanced Options Toggle */}
           <button
             type="button"
@@ -181,18 +302,26 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
 
           {showAdvanced && (
             <div className="space-y-6 pt-4 border-t border-border/50">
-              {/* Cache Option */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="use-cache"
-                  checked={useCache}
-                  onChange={(e) => setUseCache(e.target.checked)}
-                  className="rounded"
-                />
-                <Label htmlFor="use-cache" className="text-sm font-normal">
-                  Use cached page content (faster, reduces costs)
-                </Label>
+              {/* Smart Routing by Cost Tier */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Smart Routing (auto-select model)</Label>
+                <Select
+                  value={costTier}
+                  onValueChange={(v) => setCostTier(v as CostTier | "")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Use selected model above" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Use selected model</SelectItem>
+                    <SelectItem value="budget">Budget (cheapest)</SelectItem>
+                    <SelectItem value="standard">Standard (balanced)</SelectItem>
+                    <SelectItem value="premium">Premium (best quality)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  If set, the system will auto-select the best model for your chosen cost tier
+                </p>
               </div>
 
               {/* Page Actions */}

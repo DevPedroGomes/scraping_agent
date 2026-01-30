@@ -18,8 +18,19 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.app_name,
-        description="Intelligent Web Scraping API powered by AI - Skills Showcase",
-        version="2.0.0",
+        description="""
+AI Web Scraper API v3.0 - Multi-Provider LLM Extraction
+
+**Features**:
+- 5 AI Providers: OpenAI, DeepSeek, Gemini, Anthropic, Grok
+- 15+ AI Models with smart cost-tier routing
+- HTML to Markdown conversion (67% token reduction)
+- Playwright stealth mode (anti-bot detection)
+- Page actions (click, scroll, wait, type)
+- Structured output validation
+- Intelligent caching
+        """,
+        version="3.0.0",
         lifespan=lifespan,
         docs_url="/docs",
         redoc_url="/redoc"

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ScrapeResponse } from "@/types";
+import { PROVIDER_NAMES, type ModelProvider } from "@/types";
 
 interface ScraperResultProps {
   result: ScrapeResponse | null;
@@ -56,6 +57,10 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
 
   if (!result) return null;
 
+  const providerName = result.provider_used
+    ? PROVIDER_NAMES[result.provider_used as ModelProvider] || result.provider_used
+    : null;
+
   return (
     <Card className="border-border/50 h-full">
       <CardHeader className="pb-4">
@@ -69,6 +74,8 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
             </CardTitle>
             <CardDescription>
               Executed in {result.execution_time.toFixed(2)}s
+              {result.model_used && ` using ${result.model_used}`}
+              {providerName && ` (${providerName})`}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={onClear}>
@@ -81,6 +88,22 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
           {result.cache_hit && (
             <Badge variant="secondary" className="text-xs">
               Cache Hit
+            </Badge>
+          )}
+          {result.markdown_used && (
+            <Badge variant="secondary" className="text-xs">
+              Markdown
+              {result.token_reduction && ` (-${result.token_reduction.toFixed(0)}%)`}
+            </Badge>
+          )}
+          {result.tokens_used && result.tokens_used > 0 && (
+            <Badge variant="outline" className="text-xs">
+              {result.tokens_used.toLocaleString()} tokens
+            </Badge>
+          )}
+          {result.estimated_cost !== undefined && result.estimated_cost !== null && result.estimated_cost > 0 && (
+            <Badge variant="outline" className="text-xs">
+              ~${result.estimated_cost.toFixed(4)}
             </Badge>
           )}
           {result.actions_executed > 0 && (
