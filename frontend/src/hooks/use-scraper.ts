@@ -12,6 +12,43 @@ import type {
 
 // Fallback models in case API is unreachable
 const FALLBACK_MODELS: Model[] = [
+  // Groq (FREE - Open Source Models)
+  {
+    id: "llama-3.3-70b-versatile",
+    name: "Llama 3.3 70B",
+    provider: "groq",
+    description: "FREE - Best open source model, rivals GPT-4",
+    tier: "free",
+    input_price: 0.00,
+    output_price: 0.00
+  },
+  {
+    id: "mixtral-8x7b-32768",
+    name: "Mixtral 8x7B",
+    provider: "groq",
+    description: "FREE - High quality MoE model with 32K context",
+    tier: "free",
+    input_price: 0.00,
+    output_price: 0.00
+  },
+  {
+    id: "llama-3.1-8b-instant",
+    name: "Llama 3.1 8B",
+    provider: "groq",
+    description: "FREE - Fast and efficient for simple tasks",
+    tier: "free",
+    input_price: 0.00,
+    output_price: 0.00
+  },
+  {
+    id: "gemma2-9b-it",
+    name: "Gemma 2 9B",
+    provider: "groq",
+    description: "FREE - Google's open source model",
+    tier: "free",
+    input_price: 0.00,
+    output_price: 0.00
+  },
   // DeepSeek (Budget - Best Value)
   {
     id: "deepseek-v3",

@@ -154,10 +154,11 @@ Extract structured data from any website using AI.
 
 **Rate Limit**: 10 requests per minute per session.
 
-**Providers**: OpenAI, DeepSeek, Gemini, Anthropic, Grok
+**Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
 
 **Features**:
-- Multi-provider AI extraction (5 providers, 15+ models)
+- Multi-provider AI extraction (6 providers, 19+ models)
+- FREE tier with Groq open source models (Llama, Mixtral, Gemma)
 - HTML to Markdown conversion (67% token reduction)
 - Playwright stealth mode (anti-bot detection)
 - Smart model routing by cost tier
@@ -225,10 +226,11 @@ async def scrape_website(
     summary="List Models",
     description="""Get list of all available AI models for scraping across all providers.
 
-**Providers**: OpenAI, DeepSeek, Gemini, Anthropic, Grok
+**Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
 
 **Cost Tiers**:
-- Budget: Cheapest options ($0.05-$0.30 per 1M input tokens)
+- FREE: Open source models via Groq ($0.00 per 1M tokens)
+- Budget: Cheapest paid options ($0.05-$0.30 per 1M input tokens)
 - Standard: Balanced cost/performance ($0.25-$1.00 per 1M input tokens)
 - Premium: Best performance ($1.25-$5.00 per 1M input tokens)
     """
@@ -239,8 +241,13 @@ async def get_available_models():
 
     # Model display names and descriptions
     model_info = {
+        # Groq (FREE - Open Source Models)
+        ModelType.LLAMA_3_3_70B: ("Llama 3.3 70B", "FREE - Best open source model, rivals GPT-4"),
+        ModelType.LLAMA_3_1_8B: ("Llama 3.1 8B", "FREE - Fast and efficient for simple tasks"),
+        ModelType.MIXTRAL_8X7B: ("Mixtral 8x7B", "FREE - High quality MoE model with 32K context"),
+        ModelType.GEMMA_2_9B: ("Gemma 2 9B", "FREE - Google's open source model"),
         # DeepSeek
-        ModelType.DEEPSEEK_CHAT: ("DeepSeek Chat", "Cheapest option - Great for simple extractions"),
+        ModelType.DEEPSEEK_CHAT: ("DeepSeek Chat", "Cheapest paid - Great for simple extractions"),
         ModelType.DEEPSEEK_V3: ("DeepSeek V3", "Best value - 95% GPT-4 quality at 5% cost"),
         # Gemini
         ModelType.GEMINI_FLASH_LITE: ("Gemini Flash Lite", "Ultra-fast and cheap - Good for large pages"),

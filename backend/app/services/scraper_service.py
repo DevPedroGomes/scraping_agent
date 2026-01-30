@@ -100,6 +100,12 @@ class SmartRouter:
 
     # Default models per tier
     TIER_MODELS = {
+        CostTier.FREE: [
+            ModelType.LLAMA_3_3_70B,
+            ModelType.MIXTRAL_8X7B,
+            ModelType.LLAMA_3_1_8B,
+            ModelType.GEMMA_2_9B,
+        ],
         CostTier.BUDGET: [
             ModelType.DEEPSEEK_CHAT,
             ModelType.GEMINI_FLASH_LITE,
@@ -382,7 +388,9 @@ class LLMProviders:
         """
         provider = MODEL_PROVIDER_MAP.get(model)
 
-        if provider == ModelProvider.OPENAI:
+        if provider == ModelProvider.GROQ:
+            return await self._extract_groq(content, prompt, model, api_key)
+        elif provider == ModelProvider.OPENAI:
             return await self._extract_openai(content, prompt, model, api_key)
         elif provider == ModelProvider.DEEPSEEK:
             return await self._extract_deepseek(content, prompt, model, api_key)
@@ -566,6 +574,43 @@ Return only valid JSON, no explanation or markdown formatting."""
 
         result_text = response.choices[0].message.content
         tokens_used = response.usage.total_tokens if response.usage else 0
+
+        try:
+            return json.loads(result_text), tokens_used
+        except json.JSONDecodeError:
+            return {"raw_text": result_text}, tokens_used
+
+    async def _extract_groq(
+        self,
+        content: str,
+        prompt: str,
+        model: ModelType,
+        api_key: str
+    ) -> tuple[Any, int]:
+        """Extract using Groq with open source models (FREE - OpenAI-compatible API)."""
+        client = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1"
+        )
+
+        messages = [
+            {"role": "system", "content": "You are a data extraction assistant. Extract the requested information and return it as valid JSON only, no markdown formatting."},
+            {"role": "user", "content": f"{prompt}\n\nContent:\n{content}"}
+        ]
+
+        response = await client.chat.completions.create(
+            model=model.value,
+            messages=messages,
+            temperature=0.1,
+        )
+
+        result_text = response.choices[0].message.content
+        tokens_used = response.usage.total_tokens if response.usage else 0
+
+        # Clean up response (remove markdown if present)
+        if result_text.startswith("```"):
+            result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
+            result_text = re.sub(r'\n?```$', '', result_text)
 
         try:
             return json.loads(result_text), tokens_used

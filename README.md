@@ -4,18 +4,19 @@ A full-stack web scraping application powered by multiple LLM providers. Users p
 
 ## What's New in v3.0
 
-- **5 AI Providers**: OpenAI, DeepSeek, Gemini, Anthropic, Grok
-- **15+ Models**: From budget ($0.05/1M tokens) to premium ($25/1M tokens)
+- **6 AI Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
+- **19+ Models**: From FREE ($0/1M tokens) to premium ($25/1M tokens)
+- **FREE Tier**: Zero-cost scraping with Groq open source models (Llama, Mixtral, Gemma)
 - **67% Token Reduction**: HTML to Markdown conversion saves costs
 - **Stealth Mode**: Anti-bot detection bypass with Playwright
-- **Smart Routing**: Auto-select models by cost tier (budget/standard/premium)
+- **Smart Routing**: Auto-select models by cost tier (free/budget/standard/premium)
 - **Real-time Cost Tracking**: See tokens used and estimated cost per request
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-Provider AI** | Choose from OpenAI, DeepSeek, Gemini, Anthropic, or Grok |
+| **Multi-Provider AI** | Choose from Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, or Grok |
 | **Intelligent Extraction** | Natural language prompts to extract any data |
 | **Stealth Mode** | Bypass bot detection with browser fingerprint evasion |
 | **Markdown Conversion** | Reduce tokens by 67% with HTML to Markdown |
@@ -27,7 +28,15 @@ A full-stack web scraping application powered by multiple LLM providers. Users p
 
 ## Supported Models & Pricing
 
-### Budget Tier (Cheapest)
+### FREE Tier (Zero Cost)
+| Model | Provider | Input/Output per 1M tokens |
+|-------|----------|---------------------------|
+| Llama 3.3 70B | Groq | $0.00 / $0.00 |
+| Mixtral 8x7B | Groq | $0.00 / $0.00 |
+| Llama 3.1 8B | Groq | $0.00 / $0.00 |
+| Gemma 2 9B | Groq | $0.00 / $0.00 |
+
+### Budget Tier (Cheapest Paid)
 | Model | Provider | Input/Output per 1M tokens |
 |-------|----------|---------------------------|
 | GPT-5 Nano | OpenAI | $0.05 / $0.40 |
@@ -62,7 +71,7 @@ ai-web-scraper/
 │       ├── core/
 │       │   ├── config.py    # Environment configuration
 │       │   └── session_manager.py  # Session and rate limiting
-│       ├── models/schemas.py       # Pydantic models (15+ AI models)
+│       ├── models/schemas.py       # Pydantic models (19+ AI models)
 │       └── services/
 │           └── scraper_service.py  # Multi-provider scraping logic
 │               ├── HTMLToMarkdown      # 67% token reduction
@@ -70,7 +79,7 @@ ai-web-scraper/
 │               ├── PageCache           # TTL-based caching
 │               ├── OutputValidator     # Schema validation
 │               ├── PageActionExecutor  # Playwright stealth mode
-│               └── LLMProviders        # OpenAI, DeepSeek, Gemini, Anthropic, Grok
+│               └── LLMProviders        # Groq, OpenAI, DeepSeek, Gemini, Anthropic, Grok
 │
 └── frontend/                # Next.js 16 client
     └── src/
@@ -82,7 +91,7 @@ ai-web-scraper/
         │       └── status-bar.tsx      # API health status
         ├── hooks/           # Custom React hooks
         ├── lib/api.ts       # API client
-        └── types/           # TypeScript definitions (15+ models)
+        └── types/           # TypeScript definitions (19+ models)
 ```
 
 ## How It Works
@@ -94,7 +103,7 @@ ai-web-scraper/
 
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────────────┐
 │  USER    │     │ FRONTEND │     │ BACKEND  │     │    AI PROVIDERS      │
-│          │     │ (Next.js)│     │ (FastAPI)│     │ OpenAI/DeepSeek/     │
+│          │     │ (Next.js)│     │ (FastAPI)│     │ Groq/OpenAI/DeepSeek/│
 │          │     │          │     │          │     │ Gemini/Anthropic/Grok│
 └────┬─────┘     └────┬─────┘     └────┬─────┘     └──────────┬───────────┘
      │                │                │                      │
@@ -186,7 +195,7 @@ ai-web-scraper/
 | GET | `/api/v1/session/{id}` | Get session info |
 | DELETE | `/api/v1/session/{id}` | End session |
 | POST | `/api/v1/scrape` | Execute scraping |
-| GET | `/api/v1/models` | List all 15+ models with pricing |
+| GET | `/api/v1/models` | List all 19+ models with pricing |
 
 ### Scrape Request
 
@@ -257,6 +266,7 @@ Auto-select the best model for your budget:
 
 | Cost Tier | Default Model | Use Case |
 |-----------|---------------|----------|
+| `free` | Llama 3.3 70B | Zero-cost extractions |
 | `budget` | DeepSeek Chat | Simple extractions |
 | `standard` | DeepSeek V3 | Balanced quality |
 | `premium` | GPT-5 | Complex extractions |
@@ -266,6 +276,7 @@ Use your preferred AI provider:
 
 | Provider | API Key Format | Models |
 |----------|----------------|--------|
+| Groq | `gsk_...` | Llama 3.3 70B, Mixtral 8x7B, Llama 3.1 8B, Gemma 2 9B (FREE) |
 | OpenAI | `sk-...` | GPT-5, GPT-4o |
 | DeepSeek | `sk-...` | DeepSeek V3, Chat |
 | Google | `AI...` | Gemini Flash, Pro |
@@ -391,17 +402,18 @@ Deploy directly to Vercel. Set `NEXT_PUBLIC_API_URL` to your backend URL.
 
 ## Version History
 
-- **v3.0.0**: Multi-provider support (5 providers, 15+ models), stealth mode, HTML to Markdown conversion, smart routing, cost tracking
+- **v3.0.0**: Multi-provider support (6 providers, 19+ models), FREE tier with Groq open source models, stealth mode, HTML to Markdown conversion, smart routing, cost tracking
 - **v2.0.0**: Added structured output, page caching, and page actions
 - **v1.0.0**: Initial release with basic scraping
 
 ## Cost Optimization Tips
 
-1. **Use Markdown Conversion**: Reduces tokens by ~67%
-2. **Enable Caching**: Avoid re-fetching same pages
-3. **Choose Budget Tier**: DeepSeek V3 offers 95% of GPT-4 quality at 5% cost
-4. **Use Smart Routing**: Let the system pick the cheapest model for your tier
-5. **Define Output Schema**: More precise prompts = fewer tokens
+1. **Use FREE Tier**: Groq models (Llama 3.3 70B, Mixtral) are completely free and rival GPT-4 quality
+2. **Use Markdown Conversion**: Reduces tokens by ~67%
+3. **Enable Caching**: Avoid re-fetching same pages
+4. **Choose Budget Tier**: If paid, DeepSeek V3 offers 95% of GPT-4 quality at 5% cost
+5. **Use Smart Routing**: Let the system pick the cheapest model for your tier
+6. **Define Output Schema**: More precise prompts = fewer tokens
 
 ## License
 

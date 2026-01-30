@@ -1,8 +1,13 @@
 // AI Provider types
-export type ModelProvider = "openai" | "deepseek" | "gemini" | "anthropic" | "grok";
+export type ModelProvider = "groq" | "openai" | "deepseek" | "gemini" | "anthropic" | "grok";
 
 // Model types across all providers
 export type ModelType =
+  // Groq (FREE - Open Source Models)
+  | "llama-3.3-70b-versatile"
+  | "llama-3.1-8b-instant"
+  | "mixtral-8x7b-32768"
+  | "gemma2-9b-it"
   // DeepSeek (Budget)
   | "deepseek-chat"
   | "deepseek-v3"
@@ -26,7 +31,7 @@ export type ModelType =
   | "grok-4";
 
 // Cost tier for smart routing
-export type CostTier = "budget" | "standard" | "premium";
+export type CostTier = "free" | "budget" | "standard" | "premium";
 
 export type ActionType = "click" | "scroll" | "wait" | "type";
 
@@ -120,6 +125,11 @@ export interface ModelsResponse {
 
 // Helper to get provider from model
 export const MODEL_TO_PROVIDER: Record<ModelType, ModelProvider> = {
+  // Groq (FREE)
+  "llama-3.3-70b-versatile": "groq",
+  "llama-3.1-8b-instant": "groq",
+  "mixtral-8x7b-32768": "groq",
+  "gemma2-9b-it": "groq",
   // DeepSeek
   "deepseek-chat": "deepseek",
   "deepseek-v3": "deepseek",
@@ -144,6 +154,7 @@ export const MODEL_TO_PROVIDER: Record<ModelType, ModelProvider> = {
 
 // Provider display names
 export const PROVIDER_NAMES: Record<ModelProvider, string> = {
+  groq: "Groq (FREE)",
   openai: "OpenAI",
   deepseek: "DeepSeek",
   gemini: "Google Gemini",
@@ -153,6 +164,7 @@ export const PROVIDER_NAMES: Record<ModelProvider, string> = {
 
 // Provider API key labels
 export const PROVIDER_API_KEY_LABELS: Record<ModelProvider, string> = {
+  groq: "Groq API Key (FREE)",
   openai: "OpenAI API Key",
   deepseek: "DeepSeek API Key",
   gemini: "Google AI API Key",

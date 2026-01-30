@@ -6,6 +6,7 @@ from enum import Enum
 
 class ModelProvider(str, Enum):
     """AI Provider for LLM inference."""
+    GROQ = "groq"  # FREE - Open source models
     OPENAI = "openai"
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"
@@ -15,6 +16,12 @@ class ModelProvider(str, Enum):
 
 class ModelType(str, Enum):
     """Available models across all providers."""
+    # Groq (FREE - Open Source Models)
+    LLAMA_3_3_70B = "llama-3.3-70b-versatile"    # FREE - Best open source
+    LLAMA_3_1_8B = "llama-3.1-8b-instant"        # FREE - Fast
+    MIXTRAL_8X7B = "mixtral-8x7b-32768"          # FREE - Good quality
+    GEMMA_2_9B = "gemma2-9b-it"                  # FREE - Google open source
+
     # DeepSeek (CHEAPEST - Best value)
     DEEPSEEK_CHAT = "deepseek-chat"          # $0.14/$0.28 per 1M tokens
     DEEPSEEK_V3 = "deepseek-v3"              # $0.27/$1.10 per 1M tokens
@@ -45,6 +52,11 @@ class ModelType(str, Enum):
 
 # Model to Provider mapping
 MODEL_PROVIDER_MAP = {
+    # Groq (FREE)
+    ModelType.LLAMA_3_3_70B: ModelProvider.GROQ,
+    ModelType.LLAMA_3_1_8B: ModelProvider.GROQ,
+    ModelType.MIXTRAL_8X7B: ModelProvider.GROQ,
+    ModelType.GEMMA_2_9B: ModelProvider.GROQ,
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: ModelProvider.DEEPSEEK,
     ModelType.DEEPSEEK_V3: ModelProvider.DEEPSEEK,
@@ -69,6 +81,12 @@ MODEL_PROVIDER_MAP = {
 
 # Model pricing info (input/output per 1M tokens)
 MODEL_PRICING = {
+    # Groq (FREE)
+    ModelType.LLAMA_3_3_70B: {"input": 0.00, "output": 0.00, "tier": "free"},
+    ModelType.LLAMA_3_1_8B: {"input": 0.00, "output": 0.00, "tier": "free"},
+    ModelType.MIXTRAL_8X7B: {"input": 0.00, "output": 0.00, "tier": "free"},
+    ModelType.GEMMA_2_9B: {"input": 0.00, "output": 0.00, "tier": "free"},
+    # DeepSeek
     ModelType.DEEPSEEK_CHAT: {"input": 0.14, "output": 0.28, "tier": "budget"},
     ModelType.DEEPSEEK_V3: {"input": 0.27, "output": 1.10, "tier": "budget"},
     ModelType.GEMINI_FLASH_LITE: {"input": 0.10, "output": 0.40, "tier": "budget"},
@@ -97,7 +115,8 @@ class ActionType(str, Enum):
 
 class CostTier(str, Enum):
     """Cost tier for smart routing."""
-    BUDGET = "budget"      # Cheapest models
+    FREE = "free"          # Free models (Groq)
+    BUDGET = "budget"      # Cheapest paid models
     STANDARD = "standard"  # Balanced cost/performance
     PREMIUM = "premium"    # Best performance
 
