@@ -5,7 +5,8 @@ import { ScraperForm } from "./scraper-form";
 import { ScraperResult } from "./scraper-result";
 import { StatusBar } from "./status-bar";
 import { toast } from "sonner";
-import type { ScrapeRequest } from "@/types";
+import type { ScrapeRequest, ExampleScrape } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 export function Scraper() {
   const {
@@ -15,6 +16,7 @@ export function Scraper() {
     session,
     health,
     models,
+    examples,
     scrape,
     clearResult,
   } = useScraper();
@@ -32,8 +34,40 @@ export function Scraper() {
     }
   };
 
+  const handleExampleClick = (example: ExampleScrape) => {
+    handleSubmit({
+      url: example.url,
+      prompt: example.prompt,
+      model: example.model,
+      use_cache: true,
+      stealth_mode: true,
+      use_markdown: true,
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Example buttons */}
+      {examples.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Try an example:</span>
+          {examples.map((example) => (
+            <button
+              key={example.id}
+              type="button"
+              onClick={() => handleExampleClick(example)}
+              disabled={isLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border/50 bg-muted/30 hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {example.name}
+              <Badge variant="secondary" className="text-[10px] px-1">
+                FREE
+              </Badge>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <ScraperForm
           models={models}

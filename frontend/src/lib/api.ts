@@ -3,7 +3,8 @@ import type {
   ScrapeResponse,
   SessionInfo,
   HealthResponse,
-  ModelsResponse
+  ModelsResponse,
+  ExamplesResponse,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -94,6 +95,10 @@ class ApiClient {
 
   async getModels(): Promise<ModelsResponse> {
     return this.request<ModelsResponse>("/api/v1/models");
+  }
+
+  async getExamples(): Promise<ExamplesResponse> {
+    return this.request<ExamplesResponse>("/api/v1/examples");
   }
 }
 

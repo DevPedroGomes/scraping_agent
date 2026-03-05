@@ -1,35 +1,34 @@
 """
-AI Web Scraper Service - v3.0.0
+AI Web Scraper Service - v4.0.0
 
 Features:
-- Multi-provider LLM support (OpenAI, DeepSeek, Gemini, Anthropic, Grok)
+- Multi-provider LLM support (OpenAI, DeepSeek, Gemini, Anthropic, Grok, Groq)
 - HTML to Markdown conversion (67% token reduction)
-- Playwright stealth mode (anti-bot detection)
+- Enhanced Playwright stealth mode (59 flags, resource blocking)
 - Smart model routing by cost tier
-- Page caching with TTL
+- Persistent SQLite cache (survives restarts)
+- SSRF protection via URL validation
+- Content truncation per model context limits
+- LLM retry with exponential backoff
 - Structured output validation
 - Page actions (click, scroll, wait, type)
 """
 
 import asyncio
-import hashlib
-import time
 import json
 import re
+import time
 from typing import Any
 from datetime import datetime, timezone
-from cachetools import TTLCache
+
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
-
-# Browser automation
 from playwright.async_api import async_playwright
 
 # AI Providers
 import openai
 import anthropic
 import google.generativeai as genai
-import httpx
 
 from app.models.schemas import (
     ScrapeRequest,
@@ -42,14 +41,24 @@ from app.models.schemas import (
     OutputField,
     MODEL_PROVIDER_MAP,
     MODEL_PRICING,
+    MODEL_CONTEXT_LIMITS,
 )
 from app.core.config import get_settings
+from app.core.cache import SQLiteCache
+from app.core.url_validator import validate_url
+from app.core.constants import (
+    BLOCKED_RESOURCE_TYPES,
+    STEALTH_ARGS,
+    DEFAULT_ARGS,
+    HARMFUL_ARGS,
+    get_random_user_agent,
+    generate_convincing_referer,
+)
 
 
 class HTMLToMarkdown:
     """Converts HTML to clean Markdown for LLM consumption."""
 
-    # Tags to remove completely
     REMOVE_TAGS = [
         'script', 'style', 'nav', 'footer', 'header', 'aside',
         'noscript', 'iframe', 'svg', 'canvas', 'video', 'audio',
@@ -64,27 +73,22 @@ class HTMLToMarkdown:
         """
         original_length = len(html)
 
-        # Parse HTML
         soup = BeautifulSoup(html, 'html.parser')
 
-        # Remove unwanted tags
         for tag in HTMLToMarkdown.REMOVE_TAGS:
             for element in soup.find_all(tag):
                 element.decompose()
 
-        # Remove comments
         for comment in soup.find_all(string=lambda text: isinstance(text, str) and text.strip().startswith('<!--')):
             comment.extract()
 
-        # Convert to markdown
         markdown = md(
             str(soup),
             heading_style="ATX",
             bullets="-",
-            strip=['a'],  # Remove links but keep text
+            strip=['a'],
         )
 
-        # Clean up excessive whitespace
         markdown = re.sub(r'\n{3,}', '\n\n', markdown)
         markdown = re.sub(r' {2,}', ' ', markdown)
         markdown = markdown.strip()
@@ -98,7 +102,6 @@ class HTMLToMarkdown:
 class SmartRouter:
     """Routes requests to the optimal model based on cost tier."""
 
-    # Default models per tier
     TIER_MODELS = {
         CostTier.FREE: [
             ModelType.LLAMA_3_3_70B,
@@ -128,52 +131,14 @@ class SmartRouter:
 
     @staticmethod
     def select_model(cost_tier: CostTier, preferred_provider: ModelProvider | None = None) -> ModelType:
-        """Select the best model for a given cost tier."""
         models = SmartRouter.TIER_MODELS.get(cost_tier, SmartRouter.TIER_MODELS[CostTier.STANDARD])
 
         if preferred_provider:
-            # Try to find a model from the preferred provider
             for model in models:
                 if MODEL_PROVIDER_MAP.get(model) == preferred_provider:
                     return model
 
-        # Return first (cheapest) model in tier
         return models[0]
-
-
-class PageCache:
-    """In-memory cache for page content."""
-
-    def __init__(self, max_size: int = 100, default_ttl: int = 3600):
-        self._cache: TTLCache = TTLCache(maxsize=max_size, ttl=default_ttl)
-        self._metadata: dict[str, dict] = {}
-
-    def _get_key(self, url: str, actions: list[PageAction] | None) -> str:
-        """Generate cache key from URL and actions."""
-        actions_str = json.dumps([a.model_dump() for a in actions]) if actions else ""
-        key_data = f"{url}:{actions_str}"
-        return hashlib.md5(key_data.encode()).hexdigest()
-
-    def get(self, url: str, actions: list[PageAction] | None = None) -> tuple[str | None, bool]:
-        """Get cached page content. Returns (content, cache_hit)."""
-        key = self._get_key(url, actions)
-        content = self._cache.get(key)
-        return content, content is not None
-
-    def set(self, url: str, content: str, actions: list[PageAction] | None = None, ttl: int | None = None):
-        """Cache page content."""
-        key = self._get_key(url, actions)
-        self._cache[key] = content
-        self._metadata[key] = {
-            "url": url,
-            "cached_at": datetime.now(timezone.utc),
-            "ttl": ttl or 3600
-        }
-
-    def clear(self):
-        """Clear all cache."""
-        self._cache.clear()
-        self._metadata.clear()
 
 
 class OutputValidator:
@@ -181,7 +146,6 @@ class OutputValidator:
 
     @staticmethod
     def build_schema_prompt(fields: list[OutputField]) -> str:
-        """Build prompt addition for structured output."""
         schema_desc = "\n\nYou MUST return a JSON object with exactly these fields:\n"
         for field in fields:
             type_hint = field.type
@@ -193,7 +157,6 @@ class OutputValidator:
 
     @staticmethod
     def validate(data: Any, fields: list[OutputField]) -> tuple[bool, list[str]]:
-        """Validate data against schema. Returns (is_valid, errors)."""
         errors = []
 
         if not isinstance(data, dict):
@@ -214,7 +177,6 @@ class OutputValidator:
 
     @staticmethod
     def _check_type(value: Any, expected_type: str) -> bool:
-        """Check if value matches expected type."""
         type_map = {
             "string": str,
             "number": (int, float),
@@ -226,8 +188,16 @@ class OutputValidator:
         return isinstance(value, expected)
 
 
+async def _intercept_route(route):
+    """Block unnecessary resource types for performance."""
+    if route.request.resource_type in BLOCKED_RESOURCE_TYPES:
+        await route.abort()
+    else:
+        await route.continue_()
+
+
 class PageActionExecutor:
-    """Executes actions on page using Playwright with stealth mode."""
+    """Executes actions on page using Playwright with enhanced stealth mode."""
 
     @staticmethod
     async def execute_actions(
@@ -242,13 +212,25 @@ class PageActionExecutor:
         actions_executed = 0
 
         async with async_playwright() as p:
-            # Launch browser
-            browser = await p.chromium.launch(headless=True)
+            launch_args = {
+                "headless": True,
+            }
+            if stealth_mode:
+                launch_args["args"] = list(DEFAULT_ARGS + STEALTH_ARGS)
+                launch_args["ignore_default_args"] = list(HARMFUL_ARGS)
 
-            # Create context with stealth settings
+            browser = await p.chromium.launch(**launch_args)
+
+            user_agent = get_random_user_agent() if stealth_mode else (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+
             context_options = {
                 "viewport": {"width": 1920, "height": 1080},
-                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "screen": {"width": 1920, "height": 1080},
+                "user_agent": user_agent,
+                "color_scheme": "dark",
+                "device_scale_factor": 2,
             }
 
             if stealth_mode:
@@ -261,30 +243,20 @@ class PageActionExecutor:
             context = await browser.new_context(**context_options)
             page = await context.new_page()
 
+            # Block unnecessary resources
             if stealth_mode:
-                # Add stealth scripts
-                await page.add_init_script("""
-                    // Override webdriver property
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
+                await page.route("**/*", _intercept_route)
 
-                    // Override plugins
+            if stealth_mode:
+                await page.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                     Object.defineProperty(navigator, 'plugins', {
                         get: () => [1, 2, 3, 4, 5]
                     });
-
-                    // Override languages
                     Object.defineProperty(navigator, 'languages', {
                         get: () => ['en-US', 'en']
                     });
-
-                    // Override chrome
-                    window.chrome = {
-                        runtime: {}
-                    };
-
-                    // Override permissions
+                    window.chrome = { runtime: {} };
                     const originalQuery = window.navigator.permissions.query;
                     window.navigator.permissions.query = (parameters) => (
                         parameters.name === 'notifications' ?
@@ -294,7 +266,12 @@ class PageActionExecutor:
                 """)
 
             try:
-                await page.goto(url, wait_until="networkidle", timeout=30000)
+                referer = generate_convincing_referer(url) if stealth_mode else None
+                goto_opts = {"wait_until": "networkidle", "timeout": 30000}
+                if referer:
+                    goto_opts["referer"] = referer
+
+                await page.goto(url, **goto_opts)
 
                 for action in actions:
                     try:
@@ -334,13 +311,25 @@ class PageActionExecutor:
 
     @staticmethod
     async def fetch_page(url: str, stealth_mode: bool = True) -> str:
-        """Simple page fetch with optional stealth mode."""
+        """Simple page fetch with enhanced stealth mode."""
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            launch_args = {"headless": True}
+            if stealth_mode:
+                launch_args["args"] = list(DEFAULT_ARGS + STEALTH_ARGS)
+                launch_args["ignore_default_args"] = list(HARMFUL_ARGS)
+
+            browser = await p.chromium.launch(**launch_args)
+
+            user_agent = get_random_user_agent() if stealth_mode else (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
 
             context_options = {
                 "viewport": {"width": 1920, "height": 1080},
-                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "screen": {"width": 1920, "height": 1080},
+                "user_agent": user_agent,
+                "color_scheme": "dark",
+                "device_scale_factor": 2,
             }
 
             if stealth_mode:
@@ -354,6 +343,7 @@ class PageActionExecutor:
             page = await context.new_page()
 
             if stealth_mode:
+                await page.route("**/*", _intercept_route)
                 await page.add_init_script("""
                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
@@ -361,12 +351,38 @@ class PageActionExecutor:
                 """)
 
             try:
-                await page.goto(url, wait_until="networkidle", timeout=30000)
+                referer = generate_convincing_referer(url) if stealth_mode else None
+                goto_opts = {"wait_until": "networkidle", "timeout": 30000}
+                if referer:
+                    goto_opts["referer"] = referer
+
+                await page.goto(url, **goto_opts)
                 content = await page.content()
             finally:
                 await browser.close()
 
         return content
+
+
+async def _retry_with_backoff(func, max_retries: int = 3, base_delay: float = 1.0):
+    """Retry an async function with exponential backoff.
+
+    Does NOT retry on auth errors (api_key, authentication, invalid key).
+    """
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return await func()
+        except Exception as e:
+            last_error = e
+            error_msg = str(e).lower()
+            # Don't retry auth errors
+            if any(kw in error_msg for kw in ("api_key", "authentication", "invalid", "unauthorized", "forbidden")):
+                raise
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                await asyncio.sleep(delay)
+    raise last_error
 
 
 class LLMProviders:
@@ -382,102 +398,69 @@ class LLMProviders:
         model: ModelType,
         api_key: str
     ) -> tuple[Any, int]:
-        """
-        Extract data using the specified model.
-        Returns (extracted_data, tokens_used)
-        """
+        """Extract data using the specified model with retry."""
         provider = MODEL_PROVIDER_MAP.get(model)
 
-        if provider == ModelProvider.GROQ:
-            return await self._extract_groq(content, prompt, model, api_key)
-        elif provider == ModelProvider.OPENAI:
-            return await self._extract_openai(content, prompt, model, api_key)
-        elif provider == ModelProvider.DEEPSEEK:
-            return await self._extract_deepseek(content, prompt, model, api_key)
-        elif provider == ModelProvider.GEMINI:
-            return await self._extract_gemini(content, prompt, model, api_key)
-        elif provider == ModelProvider.ANTHROPIC:
-            return await self._extract_anthropic(content, prompt, model, api_key)
-        elif provider == ModelProvider.GROK:
-            return await self._extract_grok(content, prompt, model, api_key)
-        else:
+        extract_map = {
+            ModelProvider.GROQ: self._extract_groq,
+            ModelProvider.OPENAI: self._extract_openai,
+            ModelProvider.DEEPSEEK: self._extract_deepseek,
+            ModelProvider.GEMINI: self._extract_gemini,
+            ModelProvider.ANTHROPIC: self._extract_anthropic,
+            ModelProvider.GROK: self._extract_grok,
+        }
+
+        extract_fn = extract_map.get(provider)
+        if not extract_fn:
             raise ValueError(f"Unsupported provider for model: {model}")
 
-    async def _extract_openai(
-        self,
-        content: str,
-        prompt: str,
-        model: ModelType,
-        api_key: str
-    ) -> tuple[Any, int]:
-        """Extract using OpenAI models."""
-        client = openai.AsyncOpenAI(api_key=api_key)
+        return await _retry_with_backoff(
+            lambda: extract_fn(content, prompt, model, api_key)
+        )
 
+    async def _extract_openai(
+        self, content: str, prompt: str, model: ModelType, api_key: str
+    ) -> tuple[Any, int]:
+        client = openai.AsyncOpenAI(api_key=api_key)
         messages = [
             {"role": "system", "content": "You are a data extraction assistant. Extract the requested information and return it as JSON."},
             {"role": "user", "content": f"{prompt}\n\nContent:\n{content}"}
         ]
-
         response = await client.chat.completions.create(
-            model=model.value,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+            model=model.value, messages=messages,
+            response_format={"type": "json_object"}, temperature=0.1,
         )
-
         result_text = response.choices[0].message.content
         tokens_used = response.usage.total_tokens if response.usage else 0
-
         try:
             return json.loads(result_text), tokens_used
         except json.JSONDecodeError:
             return {"raw_text": result_text}, tokens_used
 
     async def _extract_deepseek(
-        self,
-        content: str,
-        prompt: str,
-        model: ModelType,
-        api_key: str
+        self, content: str, prompt: str, model: ModelType, api_key: str
     ) -> tuple[Any, int]:
-        """Extract using DeepSeek models (OpenAI-compatible API)."""
-        client = openai.AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://api.deepseek.com/v1"
-        )
-
+        client = openai.AsyncOpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
         messages = [
             {"role": "system", "content": "You are a data extraction assistant. Extract the requested information and return it as JSON."},
             {"role": "user", "content": f"{prompt}\n\nContent:\n{content}"}
         ]
-
         response = await client.chat.completions.create(
-            model=model.value,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+            model=model.value, messages=messages,
+            response_format={"type": "json_object"}, temperature=0.1,
         )
-
         result_text = response.choices[0].message.content
         tokens_used = response.usage.total_tokens if response.usage else 0
-
         try:
             return json.loads(result_text), tokens_used
         except json.JSONDecodeError:
             return {"raw_text": result_text}, tokens_used
 
     async def _extract_gemini(
-        self,
-        content: str,
-        prompt: str,
-        model: ModelType,
-        api_key: str
+        self, content: str, prompt: str, model: ModelType, api_key: str
     ) -> tuple[Any, int]:
-        """Extract using Google Gemini models."""
         genai.configure(api_key=api_key)
-
         gemini_model = genai.GenerativeModel(model.value)
-
         full_prompt = f"""You are a data extraction assistant. Extract the requested information and return it as valid JSON only.
 
 {prompt}
@@ -488,41 +471,27 @@ Content:
 Return only valid JSON, no markdown formatting."""
 
         response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: gemini_model.generate_content(full_prompt)
+            None, lambda: gemini_model.generate_content(full_prompt)
         )
-
         result_text = response.text
-        # Estimate tokens (Gemini doesn't always return token count)
         tokens_used = len(content.split()) + len(result_text.split())
-
-        # Clean up response (remove markdown if present)
         if result_text.startswith("```"):
             result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
             result_text = re.sub(r'\n?```$', '', result_text)
-
         try:
             return json.loads(result_text), tokens_used
         except json.JSONDecodeError:
             return {"raw_text": result_text}, tokens_used
 
     async def _extract_anthropic(
-        self,
-        content: str,
-        prompt: str,
-        model: ModelType,
-        api_key: str
+        self, content: str, prompt: str, model: ModelType, api_key: str
     ) -> tuple[Any, int]:
-        """Extract using Anthropic Claude models."""
         client = anthropic.AsyncAnthropic(api_key=api_key)
-
         message = await client.messages.create(
-            model=model.value,
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""You are a data extraction assistant. Extract the requested information and return it as valid JSON only.
+            model=model.value, max_tokens=4096,
+            messages=[{
+                "role": "user",
+                "content": f"""You are a data extraction assistant. Extract the requested information and return it as valid JSON only.
 
 {prompt}
 
@@ -530,88 +499,53 @@ Content:
 {content}
 
 Return only valid JSON, no explanation or markdown formatting."""
-                }
-            ]
+            }]
         )
-
         result_text = message.content[0].text
         tokens_used = message.usage.input_tokens + message.usage.output_tokens
-
-        # Clean up response
         if result_text.startswith("```"):
             result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
             result_text = re.sub(r'\n?```$', '', result_text)
-
         try:
             return json.loads(result_text), tokens_used
         except json.JSONDecodeError:
             return {"raw_text": result_text}, tokens_used
 
     async def _extract_grok(
-        self,
-        content: str,
-        prompt: str,
-        model: ModelType,
-        api_key: str
+        self, content: str, prompt: str, model: ModelType, api_key: str
     ) -> tuple[Any, int]:
-        """Extract using xAI Grok models (OpenAI-compatible API)."""
-        client = openai.AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://api.x.ai/v1"
-        )
-
+        client = openai.AsyncOpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
         messages = [
             {"role": "system", "content": "You are a data extraction assistant. Extract the requested information and return it as JSON."},
             {"role": "user", "content": f"{prompt}\n\nContent:\n{content}"}
         ]
-
         response = await client.chat.completions.create(
-            model=model.value,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+            model=model.value, messages=messages,
+            response_format={"type": "json_object"}, temperature=0.1,
         )
-
         result_text = response.choices[0].message.content
         tokens_used = response.usage.total_tokens if response.usage else 0
-
         try:
             return json.loads(result_text), tokens_used
         except json.JSONDecodeError:
             return {"raw_text": result_text}, tokens_used
 
     async def _extract_groq(
-        self,
-        content: str,
-        prompt: str,
-        model: ModelType,
-        api_key: str
+        self, content: str, prompt: str, model: ModelType, api_key: str
     ) -> tuple[Any, int]:
-        """Extract using Groq with open source models (FREE - OpenAI-compatible API)."""
-        client = openai.AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1"
-        )
-
+        client = openai.AsyncOpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
         messages = [
             {"role": "system", "content": "You are a data extraction assistant. Extract the requested information and return it as valid JSON only, no markdown formatting."},
             {"role": "user", "content": f"{prompt}\n\nContent:\n{content}"}
         ]
-
         response = await client.chat.completions.create(
-            model=model.value,
-            messages=messages,
-            temperature=0.1,
+            model=model.value, messages=messages, temperature=0.1,
         )
-
         result_text = response.choices[0].message.content
         tokens_used = response.usage.total_tokens if response.usage else 0
-
-        # Clean up response (remove markdown if present)
         if result_text.startswith("```"):
             result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
             result_text = re.sub(r'\n?```$', '', result_text)
-
         try:
             return json.loads(result_text), tokens_used
         except json.JSONDecodeError:
@@ -623,7 +557,10 @@ class ScraperService:
 
     def __init__(self):
         self.settings = get_settings()
-        self.page_cache = PageCache(max_size=100, default_ttl=3600)
+        self.cache = SQLiteCache(
+            db_path=self.settings.cache_db_path,
+            default_ttl=3600,
+        )
         self.validator = OutputValidator()
         self.action_executor = PageActionExecutor()
         self.html_converter = HTMLToMarkdown()
@@ -631,13 +568,36 @@ class ScraperService:
         self.smart_router = SmartRouter()
 
     def _estimate_cost(self, model: ModelType, tokens: int) -> float:
-        """Estimate cost based on model and token usage."""
         pricing = MODEL_PRICING.get(model, {"input": 0, "output": 0})
-        # Assume 70% input, 30% output
         input_tokens = int(tokens * 0.7)
         output_tokens = int(tokens * 0.3)
         cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
         return round(cost, 6)
+
+    @staticmethod
+    def _truncate_content(content: str, model: ModelType, prompt: str) -> tuple[str, bool]:
+        """Truncate content to fit model context window.
+
+        Reserves 20% of context for prompt + output.
+        Returns (content, was_truncated).
+        """
+        limit = MODEL_CONTEXT_LIMITS.get(model, 128_000 * 4)
+        # Reserve 20% for prompt + output
+        available = int(limit * 0.8) - len(prompt)
+        if available <= 0:
+            available = 1000
+
+        if len(content) <= available:
+            return content, False
+
+        # Truncate at a clean boundary
+        truncated = content[:available]
+        last_newline = truncated.rfind('\n')
+        if last_newline > available * 0.8:
+            truncated = truncated[:last_newline]
+
+        truncated += "\n\n[Content truncated to fit model context window]"
+        return truncated, True
 
     async def scrape(self, request: ScrapeRequest) -> ScrapeResponse:
         """Main scrape method with all features."""
@@ -650,6 +610,11 @@ class ScraperService:
         token_reduction = None
         tokens_used = None
         estimated_cost = None
+        content_truncated = False
+        markdown_content = None
+        fetch_time = None
+        parse_time = None
+        llm_time = None
 
         # Determine model to use
         model = request.model
@@ -658,70 +623,89 @@ class ScraperService:
 
         provider = MODEL_PROVIDER_MAP.get(model)
 
-        # Get API key
-        api_key = request.api_key
-        if not api_key:
-            # Check for default keys based on provider
-            if provider == ModelProvider.OPENAI:
-                api_key = self.settings.default_openai_api_key
-            # Add other default keys as needed
-
-        if not api_key:
+        # SSRF protection - validate URL before anything
+        url_valid, url_error = validate_url(request.url)
+        if not url_valid:
             return ScrapeResponse(
                 success=False,
-                error=f"API key is required for {provider.value if provider else 'unknown'} provider.",
+                error=url_error,
                 execution_time=time.time() - start_time,
                 model_used=model.value,
-                provider_used=provider.value if provider else None
+                provider_used=provider.value if provider else None,
+            )
+
+        # Resolve API key: user > env (per provider) > friendly error
+        api_key = request.api_key
+        if not api_key:
+            if provider == ModelProvider.GROQ:
+                api_key = self.settings.default_groq_api_key
+            elif provider == ModelProvider.OPENAI:
+                api_key = self.settings.default_openai_api_key
+
+        if not api_key:
+            suggestion = ""
+            if provider != ModelProvider.GROQ:
+                suggestion = " Try selecting a Groq model (FREE tier) which may not require an API key."
+            return ScrapeResponse(
+                success=False,
+                error=f"API key is required for {provider.value if provider else 'unknown'} provider.{suggestion}",
+                execution_time=time.time() - start_time,
+                model_used=model.value,
+                provider_used=provider.value if provider else None,
             )
 
         try:
-            # Check cache first
-            page_content = None
+            # Serialize actions for cache key
+            actions_data = [a.model_dump() for a in request.actions] if request.actions else None
+
+            # Check cache (now covers full response including LLM result)
             if request.use_cache:
-                page_content, cache_hit = self.page_cache.get(request.url, request.actions)
+                cached_response, cache_hit = self.cache.get(
+                    request.url, actions_data, request.prompt, model.value
+                )
+                if cache_hit and cached_response:
+                    cached_response["cache_hit"] = True
+                    cached_response["execution_time"] = time.time() - start_time
+                    return ScrapeResponse(**cached_response)
 
-            # Fetch page if not cached
-            if not page_content:
-                if request.actions:
-                    page_content, actions_executed = await self.action_executor.execute_actions(
-                        request.url,
-                        request.actions,
-                        request.stealth_mode
-                    )
-                else:
-                    page_content = await self.action_executor.fetch_page(
-                        request.url,
-                        request.stealth_mode
-                    )
+            # --- FETCH ---
+            fetch_start = time.time()
+            if request.actions:
+                page_content, actions_executed = await self.action_executor.execute_actions(
+                    request.url, request.actions, request.stealth_mode
+                )
+            else:
+                page_content = await self.action_executor.fetch_page(
+                    request.url, request.stealth_mode
+                )
+            fetch_time = round(time.time() - fetch_start, 3)
 
-                # Cache the content
-                if request.use_cache:
-                    self.page_cache.set(
-                        request.url,
-                        page_content,
-                        request.actions,
-                        request.cache_ttl_minutes * 60
-                    )
-
-            # Convert to Markdown if requested
+            # --- PARSE ---
+            parse_start = time.time()
             content_for_llm = page_content
             if request.use_markdown:
                 content_for_llm, token_reduction = self.html_converter.convert(page_content)
                 markdown_used = True
+                # Keep first 5KB for display
+                markdown_content = content_for_llm[:5120] if content_for_llm else None
 
             # Build prompt with schema if provided
             prompt = request.prompt
             if request.output_schema:
                 prompt += self.validator.build_schema_prompt(request.output_schema)
 
-            # Extract data using LLM
-            result, tokens_used = await self.llm_providers.extract(
-                content_for_llm,
-                prompt,
-                model,
-                api_key
+            # Truncate content to fit model context
+            content_for_llm, content_truncated = self._truncate_content(
+                content_for_llm, model, prompt
             )
+            parse_time = round(time.time() - parse_start, 3)
+
+            # --- LLM ---
+            llm_start = time.time()
+            result, tokens_used = await self.llm_providers.extract(
+                content_for_llm, prompt, model, api_key
+            )
+            llm_time = round(time.time() - llm_start, 3)
 
             # Estimate cost
             if tokens_used:
@@ -730,30 +714,43 @@ class ScraperService:
             # Validate output if schema provided
             if request.output_schema and result:
                 validation_passed, validation_errors = self.validator.validate(
-                    result,
-                    request.output_schema
+                    result, request.output_schema
                 )
 
-            return ScrapeResponse(
-                success=True,
-                data=result,
-                execution_time=time.time() - start_time,
-                model_used=model.value,
-                provider_used=provider.value if provider else None,
-                tokens_used=tokens_used,
-                estimated_cost=estimated_cost,
-                cache_hit=cache_hit,
-                markdown_used=markdown_used,
-                token_reduction=token_reduction,
-                actions_executed=actions_executed,
-                validation_passed=validation_passed,
-                validation_errors=validation_errors if validation_errors else None
-            )
+            response_data = {
+                "success": True,
+                "data": result,
+                "execution_time": time.time() - start_time,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "model_used": model.value,
+                "provider_used": provider.value if provider else None,
+                "tokens_used": tokens_used,
+                "estimated_cost": estimated_cost,
+                "cache_hit": False,
+                "markdown_used": markdown_used,
+                "token_reduction": token_reduction,
+                "actions_executed": actions_executed,
+                "validation_passed": validation_passed,
+                "validation_errors": validation_errors if validation_errors else None,
+                "content_truncated": content_truncated,
+                "markdown_content": markdown_content,
+                "fetch_time": fetch_time,
+                "parse_time": parse_time,
+                "llm_time": llm_time,
+            }
+
+            # Cache complete response
+            if request.use_cache:
+                self.cache.set(
+                    request.url, actions_data, request.prompt, model.value,
+                    response_data, request.cache_ttl_minutes * 60
+                )
+
+            return ScrapeResponse(**response_data)
 
         except Exception as e:
             error_message = str(e)
 
-            # Friendly error messages
             if "api_key" in error_message.lower() or "authentication" in error_message.lower():
                 error_message = "Authentication error. Check your API key."
             elif "rate limit" in error_message.lower():
@@ -771,7 +768,10 @@ class ScraperService:
                 provider_used=provider.value if provider else None,
                 cache_hit=cache_hit,
                 markdown_used=markdown_used,
-                actions_executed=actions_executed
+                actions_executed=actions_executed,
+                fetch_time=fetch_time,
+                parse_time=parse_time,
+                llm_time=llm_time,
             )
 
 

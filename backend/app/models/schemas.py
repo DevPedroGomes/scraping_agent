@@ -79,6 +79,35 @@ MODEL_PROVIDER_MAP = {
     ModelType.GROK_4: ModelProvider.GROK,
 }
 
+# Model context limits in characters (~4 chars per token)
+MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
+    # Groq
+    ModelType.LLAMA_3_3_70B: 128_000 * 4,
+    ModelType.LLAMA_3_1_8B: 128_000 * 4,
+    ModelType.MIXTRAL_8X7B: 32_768 * 4,
+    ModelType.GEMMA_2_9B: 8_192 * 4,
+    # DeepSeek
+    ModelType.DEEPSEEK_CHAT: 64_000 * 4,
+    ModelType.DEEPSEEK_V3: 64_000 * 4,
+    # Gemini
+    ModelType.GEMINI_FLASH_LITE: 1_000_000 * 4,
+    ModelType.GEMINI_FLASH: 1_000_000 * 4,
+    ModelType.GEMINI_PRO: 1_000_000 * 4,
+    # OpenAI
+    ModelType.GPT_5_NANO: 128_000 * 4,
+    ModelType.GPT_5_MINI: 128_000 * 4,
+    ModelType.GPT_5: 128_000 * 4,
+    ModelType.GPT_4O_MINI: 128_000 * 4,
+    ModelType.GPT_4O: 128_000 * 4,
+    # Anthropic
+    ModelType.CLAUDE_HAIKU: 200_000 * 4,
+    ModelType.CLAUDE_SONNET: 200_000 * 4,
+    ModelType.CLAUDE_OPUS: 200_000 * 4,
+    # Grok
+    ModelType.GROK_FAST: 2_000_000 * 4,
+    ModelType.GROK_4: 2_000_000 * 4,
+}
+
 # Model pricing info (input/output per 1M tokens)
 MODEL_PRICING = {
     # Groq (FREE)
@@ -297,6 +326,29 @@ class ScrapeResponse(BaseModel):
         description="Number of page actions successfully executed"
     )
 
+    # Content truncation
+    content_truncated: bool = Field(
+        default=False,
+        description="Whether content was truncated to fit model context window"
+    )
+
+    # Intermediate content
+    markdown_content: str | None = Field(
+        default=None,
+        description="Processed markdown content (limited to 5KB for display)"
+    )
+
+    # Timing breakdown
+    fetch_time: float | None = Field(default=None, description="Time to fetch page in seconds")
+    parse_time: float | None = Field(default=None, description="Time to parse/convert content in seconds")
+    llm_time: float | None = Field(default=None, description="Time for LLM extraction in seconds")
+
+    # Cost control
+    scrapes_remaining: int | None = Field(
+        default=None,
+        description="Number of scrapes remaining in this session"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -314,7 +366,11 @@ class ScrapeResponse(BaseModel):
                 "token_reduction": 67.5,
                 "validation_passed": None,
                 "validation_errors": None,
-                "actions_executed": 0
+                "actions_executed": 0,
+                "content_truncated": False,
+                "fetch_time": 1.5,
+                "parse_time": 0.3,
+                "llm_time": 0.55
             }
         }
     )
@@ -326,6 +382,8 @@ class SessionInfo(BaseModel):
     created_at: datetime = Field(..., description="Session creation timestamp")
     last_activity: datetime = Field(..., description="Last activity timestamp")
     requests_count: int = Field(..., description="Number of requests made in this session")
+    scrape_count: int = Field(default=0, description="Number of scrapes performed")
+    max_scrapes: int = Field(default=5, description="Maximum scrapes allowed per session")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -333,7 +391,9 @@ class SessionInfo(BaseModel):
                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
                 "created_at": "2024-01-27T15:00:00Z",
                 "last_activity": "2024-01-27T15:30:00Z",
-                "requests_count": 5
+                "requests_count": 5,
+                "scrape_count": 2,
+                "max_scrapes": 5
             }
         }
     )

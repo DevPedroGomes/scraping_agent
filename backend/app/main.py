@@ -3,12 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import get_settings
+from app.core.cache import SQLiteCache
 from app.api.routes import router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
     print("Starting AI Web Scraper Showcase...")
+    cache = SQLiteCache(db_path=settings.cache_db_path)
+    deleted = cache.cleanup_expired()
+    if deleted:
+        print(f"Cache cleanup: removed {deleted} expired entries")
     yield
     print("Shutting down AI Web Scraper Showcase...")
 

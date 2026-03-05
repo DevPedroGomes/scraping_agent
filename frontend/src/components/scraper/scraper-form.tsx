@@ -37,7 +37,7 @@ interface ScraperFormProps {
 export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
   const [url, setUrl] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<ModelType>("deepseek-v3");
+  const [model, setModel] = useState<ModelType>("llama-3.3-70b-versatile");
   const [apiKey, setApiKey] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -68,7 +68,8 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
   });
 
   // Get current provider from selected model
-  const currentProvider: ModelProvider = MODEL_TO_PROVIDER[model] || "deepseek";
+  const currentProvider: ModelProvider = MODEL_TO_PROVIDER[model] || "groq";
+  const isGroq = currentProvider === "groq";
 
   // Group models by provider
   const modelsByProvider = useMemo(() => {
@@ -103,7 +104,6 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
       use_markdown: useMarkdown,
     };
 
-    // If cost tier is selected, override model selection
     if (costTier) {
       request.cost_tier = costTier;
     }
@@ -141,10 +141,11 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
     setOutputFields(outputFields.filter((_, i) => i !== index));
   };
 
+  // Groq doesn't require API key (server may have default)
   const isValid = url.trim() !== "" && prompt.trim() !== "";
 
-  // Provider order for display
-  const providerOrder: ModelProvider[] = ["deepseek", "gemini", "openai", "anthropic", "grok"];
+  // Provider order: Groq first
+  const providerOrder: ModelProvider[] = ["groq", "deepseek", "gemini", "openai", "anthropic", "grok"];
 
   return (
     <Card className="border-border/50">
@@ -182,7 +183,9 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                             </span>
                             <Badge
                               variant={
-                                m.tier === "budget"
+                                m.tier === "free"
+                                  ? "default"
+                                  : m.tier === "budget"
                                   ? "secondary"
                                   : m.tier === "premium"
                                   ? "default"
@@ -207,21 +210,29 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             )}
           </div>
 
-          {/* API Key - dynamic based on selected provider */}
-          <div className="space-y-2">
-            <Label htmlFor="api-key">{PROVIDER_API_KEY_LABELS[currentProvider]}</Label>
-            <Input
-              id="api-key"
-              type="password"
-              placeholder={currentProvider === "openai" ? "sk-..." : "Enter API key..."}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Your key is not stored and is only used for this request
-            </p>
-          </div>
+          {/* API Key - hidden for Groq, shown for others */}
+          {isGroq ? (
+            <div className="rounded-md border border-green-600/30 bg-green-950/20 p-3">
+              <p className="text-sm text-green-400">
+                Free Model — No API key required!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="api-key">{PROVIDER_API_KEY_LABELS[currentProvider]}</Label>
+              <Input
+                id="api-key"
+                type="password"
+                placeholder={currentProvider === "openai" ? "sk-..." : "Enter API key..."}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your key is not stored and is only used for this request
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="url">Website URL</Label>
@@ -314,14 +325,12 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Use selected model</SelectItem>
+                    <SelectItem value="free">Free (Groq open source)</SelectItem>
                     <SelectItem value="budget">Budget (cheapest)</SelectItem>
                     <SelectItem value="standard">Standard (balanced)</SelectItem>
                     <SelectItem value="premium">Premium (best quality)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  If set, the system will auto-select the best model for your chosen cost tier
-                </p>
               </div>
 
               {/* Page Actions */}

@@ -10,6 +10,10 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ health, session }: StatusBarProps) {
+  const scrapesExhausted = session
+    ? session.scrape_count >= session.max_scrapes
+    : false;
+
   return (
     <div className="flex items-center gap-4 text-xs text-muted-foreground">
       <div className="flex items-center gap-2">
@@ -32,8 +36,14 @@ export function StatusBar({ health, session }: StatusBarProps) {
         <>
           <Separator orientation="vertical" className="h-4" />
           <div className="flex items-center gap-1">
-            <span>Your requests:</span>
-            <span className="font-mono">{session.requests_count}</span>
+            <span>Scrapes:</span>
+            <span
+              className={`font-mono ${
+                scrapesExhausted ? "text-red-400 font-semibold" : ""
+              }`}
+            >
+              {session.scrape_count}/{session.max_scrapes}
+            </span>
           </div>
         </>
       )}

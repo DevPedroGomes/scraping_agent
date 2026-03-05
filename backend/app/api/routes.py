@@ -15,6 +15,7 @@ from app.models.schemas import (
     MODEL_PRICING,
 )
 from app.core.session_manager import session_manager
+from app.core.examples import get_examples_list, get_example_by_match
 from app.services.scraper_service import scraper_service
 
 router = APIRouter()
@@ -33,6 +34,23 @@ async def get_session_id(x_session_id: Annotated[str | None, Header()] = None) -
         return session_manager.create_session()
 
     return x_session_id
+
+
+def _build_session_info(session_id: str) -> SessionInfo:
+    """Build SessionInfo from session data."""
+    session_data = session_manager.get_session(session_id)
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    scrape_count, max_scrapes = session_manager.get_scrape_info(session_id)
+    return SessionInfo(
+        session_id=session_id,
+        created_at=session_data["created_at"],
+        last_activity=session_data["last_activity"],
+        requests_count=session_data["requests_count"],
+        scrape_count=scrape_count,
+        max_scrapes=max_scrapes,
+    )
 
 
 @router.get(
@@ -67,13 +85,7 @@ async def health_check():
     }
 )
 async def create_session():
-    """
-    Create a new session.
-
-    - **Rate limit**: 10 requests per minute per session
-    - **Timeout**: 30 minutes of inactivity
-    - **Max sessions**: 35 concurrent sessions
-    """
+    """Create a new session."""
     if session_manager.active_sessions_count >= session_manager.max_sessions:
         raise HTTPException(
             status_code=503,
@@ -81,14 +93,7 @@ async def create_session():
         )
 
     session_id = session_manager.create_session()
-    session_data = session_manager.get_session(session_id)
-
-    return SessionInfo(
-        session_id=session_id,
-        created_at=session_data["created_at"],
-        last_activity=session_data["last_activity"],
-        requests_count=session_data["requests_count"]
-    )
+    return _build_session_info(session_id)
 
 
 @router.get(
@@ -96,29 +101,11 @@ async def create_session():
     response_model=SessionInfo,
     summary="Get Session",
     description="Retrieve information about an existing session.",
-    responses={
-        404: {
-            "description": "Session not found",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Session not found"}
-                }
-            }
-        }
-    }
+    responses={404: {"description": "Session not found"}}
 )
 async def get_session(session_id: str):
     """Get session details by ID."""
-    session_data = session_manager.get_session(session_id)
-    if not session_data:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    return SessionInfo(
-        session_id=session_id,
-        created_at=session_data["created_at"],
-        last_activity=session_data["last_activity"],
-        requests_count=session_data["requests_count"]
-    )
+    return _build_session_info(session_id)
 
 
 @router.delete(
@@ -126,16 +113,7 @@ async def get_session(session_id: str):
     response_model=DeleteSessionResponse,
     summary="Delete Session",
     description="Close and delete an existing session.",
-    responses={
-        404: {
-            "description": "Session not found",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Session not found"}
-                }
-            }
-        }
-    }
+    responses={404: {"description": "Session not found"}}
 )
 async def delete_session(session_id: str):
     """Delete a session by ID."""
@@ -143,6 +121,16 @@ async def delete_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
     return DeleteSessionResponse(message="Session closed successfully")
+
+
+@router.get(
+    "/examples",
+    summary="List Examples",
+    description="Get list of pre-cached example scrapes for showcase mode."
+)
+async def list_examples():
+    """Returns available example scrapes."""
+    return {"examples": get_examples_list()}
 
 
 @router.post(
@@ -153,62 +141,47 @@ async def delete_session(session_id: str):
 Extract structured data from any website using AI.
 
 **Rate Limit**: 10 requests per minute per session.
+**Scrape Limit**: 5 scrapes per session (examples don't count).
 
 **Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
-
-**Features**:
-- Multi-provider AI extraction (6 providers, 19+ models)
-- FREE tier with Groq open source models (Llama, Mixtral, Gemma)
-- HTML to Markdown conversion (67% token reduction)
-- Playwright stealth mode (anti-bot detection)
-- Smart model routing by cost tier
-- Page actions (click, scroll, wait, type) before scraping
-- Structured output with schema validation
-- Page content caching to reduce costs
-
-**Required**: API key for your chosen provider (passed in request body)
     """,
     responses={
         429: {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit or scrape limit exceeded",
             "content": {
                 "application/json": {
                     "example": {"detail": "Request limit exceeded. Please wait a moment."}
                 }
             }
         },
-        422: {
-            "description": "Validation error",
-            "content": {
-                "application/json": {
-                    "example": {"detail": [{"loc": ["body", "url"], "msg": "field required", "type": "value_error.missing"}]}
-                }
-            }
-        }
     }
 )
 async def scrape_website(
     request: ScrapeRequest,
     session_id: str = Depends(get_session_id)
 ):
-    """
-    Scrape a website and extract data using AI.
-
-    - **url**: Target website URL
-    - **prompt**: What data to extract (natural language)
-    - **model**: AI model to use (default: deepseek-v3)
-    - **api_key**: API key for the selected model's provider
-    - **cost_tier**: Auto-select model by cost tier (budget/standard/premium)
-    - **stealth_mode**: Use anti-bot detection bypass (default: true)
-    - **use_markdown**: Convert HTML to Markdown to reduce tokens (default: true)
-    - **actions**: Optional page actions before scraping
-    - **output_schema**: Optional schema for structured output
-    - **use_cache**: Use cached page content (default: true)
-    """
+    """Scrape a website and extract data using AI."""
     if not session_manager.can_make_request(session_id):
         raise HTTPException(
             status_code=429,
             detail="Request limit exceeded. Please wait a moment."
+        )
+
+    # Check if this matches a pre-cached example (doesn't count toward limits)
+    example = get_example_by_match(request.url, request.prompt)
+    if example:
+        from datetime import datetime, timezone
+        cached = example["cached_response"].copy()
+        cached["timestamp"] = datetime.now(timezone.utc).isoformat()
+        scrape_count, max_scrapes = session_manager.get_scrape_info(session_id)
+        cached["scrapes_remaining"] = max_scrapes - scrape_count
+        return ScrapeResponse(**cached)
+
+    # Check scrape limit
+    if not session_manager.can_scrape(session_id):
+        raise HTTPException(
+            status_code=429,
+            detail="Scrape limit reached for this session. Examples are still available."
         )
 
     lock = session_manager.get_lock(session_id)
@@ -217,6 +190,15 @@ async def scrape_website(
         session_manager.update_session_activity(session_id)
 
         result = await scraper_service.scrape(request)
+
+        # Record scrape on success
+        if result.success:
+            session_manager.record_scrape(session_id)
+
+        # Add remaining scrapes info
+        scrape_count, max_scrapes = session_manager.get_scrape_info(session_id)
+        result.scrapes_remaining = max_scrapes - scrape_count
+
         return result
 
 
@@ -224,22 +206,12 @@ async def scrape_website(
     "/models",
     response_model=ModelsResponse,
     summary="List Models",
-    description="""Get list of all available AI models for scraping across all providers.
-
-**Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
-
-**Cost Tiers**:
-- FREE: Open source models via Groq ($0.00 per 1M tokens)
-- Budget: Cheapest paid options ($0.05-$0.30 per 1M input tokens)
-- Standard: Balanced cost/performance ($0.25-$1.00 per 1M input tokens)
-- Premium: Best performance ($1.25-$5.00 per 1M input tokens)
-    """
+    description="Get list of all available AI models for scraping across all providers."
 )
 async def get_available_models():
     """Returns all available AI models across all providers."""
     models = []
 
-    # Model display names and descriptions
     model_info = {
         # Groq (FREE - Open Source Models)
         ModelType.LLAMA_3_3_70B: ("Llama 3.3 70B", "FREE - Best open source model, rivals GPT-4"),
@@ -284,4 +256,4 @@ async def get_available_models():
             output_price=pricing["output"]
         ))
 
-    return ModelsResponse(models=models, default_model="deepseek-v3")
+    return ModelsResponse(models=models, default_model="llama-3.3-70b-versatile")

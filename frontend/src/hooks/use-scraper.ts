@@ -7,12 +7,12 @@ import type {
   ScrapeResponse,
   SessionInfo,
   HealthResponse,
-  Model
+  Model,
+  ExampleScrape,
 } from "@/types";
 
 // Fallback models in case API is unreachable
 const FALLBACK_MODELS: Model[] = [
-  // Groq (FREE - Open Source Models)
   {
     id: "llama-3.3-70b-versatile",
     name: "Llama 3.3 70B",
@@ -32,25 +32,6 @@ const FALLBACK_MODELS: Model[] = [
     output_price: 0.00
   },
   {
-    id: "llama-3.1-8b-instant",
-    name: "Llama 3.1 8B",
-    provider: "groq",
-    description: "FREE - Fast and efficient for simple tasks",
-    tier: "free",
-    input_price: 0.00,
-    output_price: 0.00
-  },
-  {
-    id: "gemma2-9b-it",
-    name: "Gemma 2 9B",
-    provider: "groq",
-    description: "FREE - Google's open source model",
-    tier: "free",
-    input_price: 0.00,
-    output_price: 0.00
-  },
-  // DeepSeek (Budget - Best Value)
-  {
     id: "deepseek-v3",
     name: "DeepSeek V3",
     provider: "deepseek",
@@ -60,16 +41,6 @@ const FALLBACK_MODELS: Model[] = [
     output_price: 1.10
   },
   {
-    id: "deepseek-chat",
-    name: "DeepSeek Chat",
-    provider: "deepseek",
-    description: "Cheapest option - Great for simple extractions",
-    tier: "budget",
-    input_price: 0.14,
-    output_price: 0.28
-  },
-  // Gemini
-  {
     id: "gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
     provider: "gemini",
@@ -78,7 +49,6 @@ const FALLBACK_MODELS: Model[] = [
     input_price: 0.30,
     output_price: 2.50
   },
-  // OpenAI
   {
     id: "gpt-5-mini",
     name: "GPT-5 Mini",
@@ -88,7 +58,6 @@ const FALLBACK_MODELS: Model[] = [
     input_price: 0.25,
     output_price: 2.00
   },
-  // Anthropic
   {
     id: "claude-haiku-4.5",
     name: "Claude Haiku 4.5",
@@ -97,16 +66,6 @@ const FALLBACK_MODELS: Model[] = [
     tier: "standard",
     input_price: 1.00,
     output_price: 5.00
-  },
-  // Grok
-  {
-    id: "grok-4-fast",
-    name: "Grok 4 Fast",
-    provider: "grok",
-    description: "Fast with 2M context window",
-    tier: "budget",
-    input_price: 0.20,
-    output_price: 0.50
   },
 ];
 
@@ -117,6 +76,19 @@ export function useScraper() {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [models, setModels] = useState<Model[]>(FALLBACK_MODELS);
+  const [examples, setExamples] = useState<ExampleScrape[]>([]);
+
+  const refreshSession = useCallback(async () => {
+    const sessionId = apiClient.getSessionId();
+    if (sessionId) {
+      try {
+        const sessionInfo = await apiClient.getSession(sessionId);
+        setSession(sessionInfo);
+      } catch {
+        // Session may have expired
+      }
+    }
+  }, []);
 
   const initSession = useCallback(async () => {
     try {
@@ -158,6 +130,15 @@ export function useScraper() {
     }
   }, []);
 
+  const fetchExamples = useCallback(async () => {
+    try {
+      const response = await apiClient.getExamples();
+      setExamples(response.examples);
+    } catch (err) {
+      console.error("Failed to fetch examples:", err);
+    }
+  }, []);
+
   const scrape = useCallback(async (request: ScrapeRequest) => {
     setIsLoading(true);
     setError(null);
@@ -171,6 +152,9 @@ export function useScraper() {
         setError(response.error);
       }
 
+      // Refresh session to get updated scrape counter
+      await refreshSession();
+
       return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -179,7 +163,7 @@ export function useScraper() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [refreshSession]);
 
   const clearResult = useCallback(() => {
     setResult(null);
@@ -190,7 +174,8 @@ export function useScraper() {
     initSession();
     fetchHealth();
     fetchModels();
-  }, [initSession, fetchHealth, fetchModels]);
+    fetchExamples();
+  }, [initSession, fetchHealth, fetchModels, fetchExamples]);
 
   return {
     isLoading,
@@ -199,6 +184,7 @@ export function useScraper() {
     session,
     health,
     models,
+    examples,
     scrape,
     clearResult,
     refreshHealth: fetchHealth,

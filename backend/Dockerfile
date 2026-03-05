@@ -18,6 +18,10 @@ RUN playwright install chromium --with-deps
 # Copiar codigo da aplicacao
 COPY . .
 
+# Create data directory for persistent cache
+RUN mkdir -p /app/data
+ENV CACHE_DB_PATH=/app/data/scrape_cache.db
+
 # Expor porta
 EXPOSE 8000
 

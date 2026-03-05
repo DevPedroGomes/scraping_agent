@@ -25,6 +25,10 @@ class SessionManager:
     def max_sessions(self) -> int:
         return get_settings().max_concurrent_sessions
 
+    @property
+    def max_scrapes_per_session(self) -> int:
+        return get_settings().max_scrapes_per_session
+
     def create_session(self) -> str:
         if len(self._sessions) >= self.max_sessions:
             self._cleanup_oldest_session()
@@ -34,7 +38,8 @@ class SessionManager:
         self._sessions[session_id] = {
             "created_at": now,
             "last_activity": now,
-            "requests_count": 0
+            "requests_count": 0,
+            "scrape_count": 0,
         }
         self._locks[session_id] = asyncio.Lock()
         self._request_counts[session_id] = 0
@@ -92,6 +97,26 @@ class SessionManager:
 
         self._request_counts[session_id] = self._request_counts.get(session_id, 0) + 1
         self._last_requests[session_id] = now
+
+    def can_scrape(self, session_id: str) -> bool:
+        """Check if session has scrapes remaining."""
+        session = self._sessions.get(session_id)
+        if not session:
+            return False
+        return session.get("scrape_count", 0) < self.max_scrapes_per_session
+
+    def record_scrape(self, session_id: str):
+        """Increment scrape counter for session."""
+        if session_id in self._sessions:
+            self._sessions[session_id]["scrape_count"] = (
+                self._sessions[session_id].get("scrape_count", 0) + 1
+            )
+
+    def get_scrape_info(self, session_id: str) -> tuple[int, int]:
+        """Return (scrape_count, max_scrapes)."""
+        session = self._sessions.get(session_id)
+        count = session.get("scrape_count", 0) if session else 0
+        return count, self.max_scrapes_per_session
 
     def get_lock(self, session_id: str) -> asyncio.Lock:
         if session_id not in self._locks:

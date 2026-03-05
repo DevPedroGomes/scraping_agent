@@ -14,8 +14,15 @@ class Settings(BaseSettings):
     # CORS - Frontend URL (set in production)
     frontend_url: str = "http://localhost:3000"
 
-    # Optional default API key (for demo purposes)
+    # Optional default API keys (for demo purposes)
     default_openai_api_key: str | None = None
+    default_groq_api_key: str | None = None
+
+    # Cache
+    cache_db_path: str = "scrape_cache.db"
+
+    # Cost control
+    max_scrapes_per_session: int = 5
 
     @property
     def cors_origins(self) -> list[str]:

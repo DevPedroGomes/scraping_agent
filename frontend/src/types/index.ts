@@ -64,18 +64,12 @@ export interface ScrapeRequest {
   prompt: string;
   model: ModelType;
   api_key?: string;
-  // Smart routing
   cost_tier?: CostTier;
-  // Structured output
   output_schema?: OutputField[];
-  // Page actions
   actions?: PageAction[];
-  // Caching
   use_cache?: boolean;
   cache_ttl_minutes?: number;
-  // Stealth mode
   stealth_mode?: boolean;
-  // Markdown conversion
   use_markdown?: boolean;
 }
 
@@ -101,6 +95,16 @@ export interface ScrapeResponse {
   validation_errors?: string[];
   // Actions info
   actions_executed: number;
+  // Content truncation
+  content_truncated?: boolean;
+  // Intermediate content
+  markdown_content?: string;
+  // Timing breakdown
+  fetch_time?: number;
+  parse_time?: number;
+  llm_time?: number;
+  // Cost control
+  scrapes_remaining?: number;
 }
 
 export interface SessionInfo {
@@ -108,6 +112,8 @@ export interface SessionInfo {
   created_at: string;
   last_activity: string;
   requests_count: number;
+  scrape_count: number;
+  max_scrapes: number;
 }
 
 export interface HealthResponse {
@@ -121,6 +127,19 @@ export interface HealthResponse {
 export interface ModelsResponse {
   models: Model[];
   default_model: string;
+}
+
+// Examples
+export interface ExampleScrape {
+  id: string;
+  name: string;
+  url: string;
+  prompt: string;
+  model: ModelType;
+}
+
+export interface ExamplesResponse {
+  examples: ExampleScrape[];
 }
 
 // Helper to get provider from model
