@@ -19,35 +19,32 @@ class ModelType(str, Enum):
     # Groq (FREE - Open Source Models)
     LLAMA_3_3_70B = "llama-3.3-70b-versatile"    # FREE - Best open source
     LLAMA_3_1_8B = "llama-3.1-8b-instant"        # FREE - Fast
-    MIXTRAL_8X7B = "mixtral-8x7b-32768"          # FREE - Good quality
-    GEMMA_2_9B = "gemma2-9b-it"                  # FREE - Google open source
 
     # DeepSeek (CHEAPEST - Best value)
-    DEEPSEEK_CHAT = "deepseek-chat"          # $0.14/$0.28 per 1M tokens
-    DEEPSEEK_V3 = "deepseek-v3"              # $0.27/$1.10 per 1M tokens
+    DEEPSEEK_CHAT = "deepseek-chat"          # $0.28/$0.42 per 1M tokens (DeepSeek-V3.2)
 
     # Gemini (CHEAP + Large context)
     GEMINI_FLASH_LITE = "gemini-2.5-flash-lite"  # $0.10/$0.40 per 1M tokens
     GEMINI_FLASH = "gemini-2.5-flash"            # $0.30/$2.50 per 1M tokens
-    GEMINI_PRO = "gemini-2.5-pro"                # $1.25/$2.50 per 1M tokens
+    GEMINI_PRO = "gemini-2.5-pro"                # $1.25/$10.00 per 1M tokens
 
-    # OpenAI GPT-5 (PREMIUM)
-    GPT_5_NANO = "gpt-5-nano"                # $0.05/$0.40 per 1M tokens
-    GPT_5_MINI = "gpt-5-mini"                # $0.25/$2.00 per 1M tokens
+    # OpenAI GPT-5
+    GPT_5_NANO = "gpt-5-nano"                # $0.15/$1.50 per 1M tokens
+    GPT_5_MINI = "gpt-5-mini"                # $0.50/$5.00 per 1M tokens
     GPT_5 = "gpt-5"                          # $1.25/$10.00 per 1M tokens
 
-    # OpenAI Legacy (for compatibility)
-    GPT_4O_MINI = "gpt-4o-mini"              # Legacy
-    GPT_4O = "gpt-4o"                        # Legacy
+    # OpenAI Legacy (still available via API)
+    GPT_4O_MINI = "gpt-4o-mini"              # $0.15/$0.60 per 1M tokens
+    GPT_4O = "gpt-4o"                        # $2.50/$10.00 per 1M tokens
 
-    # Anthropic Claude (Excellent structured output)
-    CLAUDE_HAIKU = "claude-haiku-4.5"        # $1.00/$5.00 per 1M tokens
-    CLAUDE_SONNET = "claude-sonnet-4.5"      # $3.00/$15.00 per 1M tokens
-    CLAUDE_OPUS = "claude-opus-4.5"          # $5.00/$25.00 per 1M tokens
+    # Anthropic Claude
+    CLAUDE_HAIKU = "claude-haiku-4-5"        # $1.00/$5.00 per 1M tokens
+    CLAUDE_SONNET = "claude-sonnet-4-6"      # $3.00/$15.00 per 1M tokens
+    CLAUDE_OPUS = "claude-opus-4-6"          # $5.00/$25.00 per 1M tokens
 
-    # xAI Grok (2M context window)
-    GROK_FAST = "grok-4-fast"                # $0.20/$0.50 per 1M tokens
-    GROK_4 = "grok-4"                        # $3.00/$15.00 per 1M tokens
+    # xAI Grok
+    GROK_FAST = "grok-4-fast-non-reasoning"  # $0.20/$0.50 per 1M tokens (2M context)
+    GROK_4 = "grok-4-0709"                   # $3.00/$15.00 per 1M tokens
 
 
 # Model to Provider mapping
@@ -55,11 +52,8 @@ MODEL_PROVIDER_MAP = {
     # Groq (FREE)
     ModelType.LLAMA_3_3_70B: ModelProvider.GROQ,
     ModelType.LLAMA_3_1_8B: ModelProvider.GROQ,
-    ModelType.MIXTRAL_8X7B: ModelProvider.GROQ,
-    ModelType.GEMMA_2_9B: ModelProvider.GROQ,
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: ModelProvider.DEEPSEEK,
-    ModelType.DEEPSEEK_V3: ModelProvider.DEEPSEEK,
     # Gemini
     ModelType.GEMINI_FLASH_LITE: ModelProvider.GEMINI,
     ModelType.GEMINI_FLASH: ModelProvider.GEMINI,
@@ -84,11 +78,8 @@ MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
     # Groq
     ModelType.LLAMA_3_3_70B: 128_000 * 4,
     ModelType.LLAMA_3_1_8B: 128_000 * 4,
-    ModelType.MIXTRAL_8X7B: 32_768 * 4,
-    ModelType.GEMMA_2_9B: 8_192 * 4,
     # DeepSeek
-    ModelType.DEEPSEEK_CHAT: 64_000 * 4,
-    ModelType.DEEPSEEK_V3: 64_000 * 4,
+    ModelType.DEEPSEEK_CHAT: 128_000 * 4,
     # Gemini
     ModelType.GEMINI_FLASH_LITE: 1_000_000 * 4,
     ModelType.GEMINI_FLASH: 1_000_000 * 4,
@@ -101,11 +92,11 @@ MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
     ModelType.GPT_4O: 128_000 * 4,
     # Anthropic
     ModelType.CLAUDE_HAIKU: 200_000 * 4,
-    ModelType.CLAUDE_SONNET: 200_000 * 4,
-    ModelType.CLAUDE_OPUS: 200_000 * 4,
+    ModelType.CLAUDE_SONNET: 1_000_000 * 4,
+    ModelType.CLAUDE_OPUS: 1_000_000 * 4,
     # Grok
     ModelType.GROK_FAST: 2_000_000 * 4,
-    ModelType.GROK_4: 2_000_000 * 4,
+    ModelType.GROK_4: 256_000 * 4,
 }
 
 # Model pricing info (input/output per 1M tokens)
@@ -113,22 +104,23 @@ MODEL_PRICING = {
     # Groq (FREE)
     ModelType.LLAMA_3_3_70B: {"input": 0.00, "output": 0.00, "tier": "free"},
     ModelType.LLAMA_3_1_8B: {"input": 0.00, "output": 0.00, "tier": "free"},
-    ModelType.MIXTRAL_8X7B: {"input": 0.00, "output": 0.00, "tier": "free"},
-    ModelType.GEMMA_2_9B: {"input": 0.00, "output": 0.00, "tier": "free"},
     # DeepSeek
-    ModelType.DEEPSEEK_CHAT: {"input": 0.14, "output": 0.28, "tier": "budget"},
-    ModelType.DEEPSEEK_V3: {"input": 0.27, "output": 1.10, "tier": "budget"},
+    ModelType.DEEPSEEK_CHAT: {"input": 0.28, "output": 0.42, "tier": "budget"},
+    # Gemini
     ModelType.GEMINI_FLASH_LITE: {"input": 0.10, "output": 0.40, "tier": "budget"},
     ModelType.GEMINI_FLASH: {"input": 0.30, "output": 2.50, "tier": "standard"},
-    ModelType.GEMINI_PRO: {"input": 1.25, "output": 2.50, "tier": "premium"},
-    ModelType.GPT_5_NANO: {"input": 0.05, "output": 0.40, "tier": "budget"},
-    ModelType.GPT_5_MINI: {"input": 0.25, "output": 2.00, "tier": "standard"},
+    ModelType.GEMINI_PRO: {"input": 1.25, "output": 10.00, "tier": "premium"},
+    # OpenAI
+    ModelType.GPT_5_NANO: {"input": 0.15, "output": 1.50, "tier": "budget"},
+    ModelType.GPT_5_MINI: {"input": 0.50, "output": 5.00, "tier": "standard"},
     ModelType.GPT_5: {"input": 1.25, "output": 10.00, "tier": "premium"},
     ModelType.GPT_4O_MINI: {"input": 0.15, "output": 0.60, "tier": "budget"},
     ModelType.GPT_4O: {"input": 2.50, "output": 10.00, "tier": "premium"},
+    # Anthropic
     ModelType.CLAUDE_HAIKU: {"input": 1.00, "output": 5.00, "tier": "standard"},
     ModelType.CLAUDE_SONNET: {"input": 3.00, "output": 15.00, "tier": "premium"},
     ModelType.CLAUDE_OPUS: {"input": 5.00, "output": 25.00, "tier": "premium"},
+    # Grok
     ModelType.GROK_FAST: {"input": 0.20, "output": 0.50, "tier": "budget"},
     ModelType.GROK_4: {"input": 3.00, "output": 15.00, "tier": "premium"},
 }
@@ -210,8 +202,8 @@ class ScrapeRequest(BaseModel):
         json_schema_extra={"example": "Extract the main heading and all paragraph texts"}
     )
     model: ModelType = Field(
-        default=ModelType.DEEPSEEK_V3,
-        description="LLM model to use for extraction (default: DeepSeek V3 - best value)"
+        default=ModelType.LLAMA_3_3_70B,
+        description="LLM model to use for extraction (default: Llama 3.3 70B - FREE)"
     )
 
     # API Keys per provider (user provides their own)
@@ -268,7 +260,7 @@ class ScrapeRequest(BaseModel):
             "example": {
                 "url": "https://example.com",
                 "prompt": "Extract the main heading text",
-                "model": "deepseek-v3",
+                "model": "llama-3.3-70b-versatile",
                 "api_key": "sk-...",
                 "use_cache": True,
                 "stealth_mode": True,
@@ -357,8 +349,8 @@ class ScrapeResponse(BaseModel):
                 "error": None,
                 "execution_time": 2.35,
                 "timestamp": "2024-01-27T15:30:00Z",
-                "model_used": "deepseek-v3",
-                "provider_used": "deepseek",
+                "model_used": "llama-3.3-70b-versatile",
+                "provider_used": "groq",
                 "tokens_used": 1500,
                 "estimated_cost": 0.002,
                 "cache_hit": False,
@@ -452,23 +444,23 @@ class ModelInfo(BaseModel):
 class ModelsResponse(BaseModel):
     """Response listing available models."""
     models: list[ModelInfo] = Field(..., description="List of available models")
-    default_model: str = Field(default="deepseek-v3", description="Default recommended model")
+    default_model: str = Field(default="llama-3.3-70b-versatile", description="Default recommended model")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "models": [
                     {
-                        "id": "deepseek-v3",
-                        "name": "DeepSeek V3",
-                        "provider": "deepseek",
-                        "description": "Best value - 95% GPT-4 quality at 5% cost",
-                        "tier": "budget",
-                        "input_price": 0.27,
-                        "output_price": 1.10
+                        "id": "llama-3.3-70b-versatile",
+                        "name": "Llama 3.3 70B",
+                        "provider": "groq",
+                        "description": "FREE - Best open source model, rivals GPT-4",
+                        "tier": "free",
+                        "input_price": 0.00,
+                        "output_price": 0.00
                     }
                 ],
-                "default_model": "deepseek-v3"
+                "default_model": "llama-3.3-70b-versatile"
             }
         }
     )

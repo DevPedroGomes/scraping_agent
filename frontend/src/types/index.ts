@@ -6,11 +6,8 @@ export type ModelType =
   // Groq (FREE - Open Source Models)
   | "llama-3.3-70b-versatile"
   | "llama-3.1-8b-instant"
-  | "mixtral-8x7b-32768"
-  | "gemma2-9b-it"
   // DeepSeek (Budget)
   | "deepseek-chat"
-  | "deepseek-v3"
   // Gemini
   | "gemini-2.5-flash-lite"
   | "gemini-2.5-flash"
@@ -23,12 +20,12 @@ export type ModelType =
   | "gpt-4o-mini"
   | "gpt-4o"
   // Anthropic Claude
-  | "claude-haiku-4.5"
-  | "claude-sonnet-4.5"
-  | "claude-opus-4.5"
+  | "claude-haiku-4-5"
+  | "claude-sonnet-4-6"
+  | "claude-opus-4-6"
   // xAI Grok
-  | "grok-4-fast"
-  | "grok-4";
+  | "grok-4-fast-non-reasoning"
+  | "grok-4-0709";
 
 // Cost tier for smart routing
 export type CostTier = "free" | "budget" | "standard" | "premium";
@@ -147,11 +144,8 @@ export const MODEL_TO_PROVIDER: Record<ModelType, ModelProvider> = {
   // Groq (FREE)
   "llama-3.3-70b-versatile": "groq",
   "llama-3.1-8b-instant": "groq",
-  "mixtral-8x7b-32768": "groq",
-  "gemma2-9b-it": "groq",
   // DeepSeek
   "deepseek-chat": "deepseek",
-  "deepseek-v3": "deepseek",
   // Gemini
   "gemini-2.5-flash-lite": "gemini",
   "gemini-2.5-flash": "gemini",
@@ -163,12 +157,12 @@ export const MODEL_TO_PROVIDER: Record<ModelType, ModelProvider> = {
   "gpt-4o-mini": "openai",
   "gpt-4o": "openai",
   // Anthropic
-  "claude-haiku-4.5": "anthropic",
-  "claude-sonnet-4.5": "anthropic",
-  "claude-opus-4.5": "anthropic",
+  "claude-haiku-4-5": "anthropic",
+  "claude-sonnet-4-6": "anthropic",
+  "claude-opus-4-6": "anthropic",
   // Grok
-  "grok-4-fast": "grok",
-  "grok-4": "grok",
+  "grok-4-fast-non-reasoning": "grok",
+  "grok-4-0709": "grok",
 };
 
 // Provider display names

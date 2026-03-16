@@ -105,18 +105,16 @@ class SmartRouter:
     TIER_MODELS = {
         CostTier.FREE: [
             ModelType.LLAMA_3_3_70B,
-            ModelType.MIXTRAL_8X7B,
             ModelType.LLAMA_3_1_8B,
-            ModelType.GEMMA_2_9B,
         ],
         CostTier.BUDGET: [
             ModelType.DEEPSEEK_CHAT,
             ModelType.GEMINI_FLASH_LITE,
             ModelType.GPT_5_NANO,
+            ModelType.GPT_4O_MINI,
             ModelType.GROK_FAST,
         ],
         CostTier.STANDARD: [
-            ModelType.DEEPSEEK_V3,
             ModelType.GEMINI_FLASH,
             ModelType.GPT_5_MINI,
             ModelType.CLAUDE_HAIKU,

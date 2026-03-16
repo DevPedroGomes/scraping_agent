@@ -23,22 +23,13 @@ const FALLBACK_MODELS: Model[] = [
     output_price: 0.00
   },
   {
-    id: "mixtral-8x7b-32768",
-    name: "Mixtral 8x7B",
-    provider: "groq",
-    description: "FREE - High quality MoE model with 32K context",
-    tier: "free",
-    input_price: 0.00,
-    output_price: 0.00
-  },
-  {
-    id: "deepseek-v3",
-    name: "DeepSeek V3",
+    id: "deepseek-chat",
+    name: "DeepSeek V3.2",
     provider: "deepseek",
-    description: "Best value - 95% GPT-4 quality at 5% cost",
+    description: "Best value - Cheap and capable (128K context)",
     tier: "budget",
-    input_price: 0.27,
-    output_price: 1.10
+    input_price: 0.28,
+    output_price: 0.42
   },
   {
     id: "gemini-2.5-flash",
@@ -55,11 +46,11 @@ const FALLBACK_MODELS: Model[] = [
     provider: "openai",
     description: "Balanced speed and intelligence",
     tier: "standard",
-    input_price: 0.25,
-    output_price: 2.00
+    input_price: 0.50,
+    output_price: 5.00
   },
   {
-    id: "claude-haiku-4.5",
+    id: "claude-haiku-4-5",
     name: "Claude Haiku 4.5",
     provider: "anthropic",
     description: "Fastest Claude - Great for structured output",

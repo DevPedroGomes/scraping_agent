@@ -23,15 +23,6 @@ export function StatusBar({ health, session }: StatusBarProps) {
         </Badge>
       </div>
 
-      <Separator orientation="vertical" className="h-4" />
-
-      <div className="flex items-center gap-1">
-        <span>Active sessions:</span>
-        <span className="font-mono">
-          {health?.active_sessions ?? "-"}/{health?.max_sessions ?? "-"}
-        </span>
-      </div>
-
       {session && (
         <>
           <Separator orientation="vertical" className="h-4" />

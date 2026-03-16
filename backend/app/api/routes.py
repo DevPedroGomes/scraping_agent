@@ -216,13 +216,10 @@ async def get_available_models():
         # Groq (FREE - Open Source Models)
         ModelType.LLAMA_3_3_70B: ("Llama 3.3 70B", "FREE - Best open source model, rivals GPT-4"),
         ModelType.LLAMA_3_1_8B: ("Llama 3.1 8B", "FREE - Fast and efficient for simple tasks"),
-        ModelType.MIXTRAL_8X7B: ("Mixtral 8x7B", "FREE - High quality MoE model with 32K context"),
-        ModelType.GEMMA_2_9B: ("Gemma 2 9B", "FREE - Google's open source model"),
         # DeepSeek
-        ModelType.DEEPSEEK_CHAT: ("DeepSeek Chat", "Cheapest paid - Great for simple extractions"),
-        ModelType.DEEPSEEK_V3: ("DeepSeek V3", "Best value - 95% GPT-4 quality at 5% cost"),
+        ModelType.DEEPSEEK_CHAT: ("DeepSeek V3.2", "Best value - Cheap and capable (128K context)"),
         # Gemini
-        ModelType.GEMINI_FLASH_LITE: ("Gemini Flash Lite", "Ultra-fast and cheap - Good for large pages"),
+        ModelType.GEMINI_FLASH_LITE: ("Gemini 2.5 Flash Lite", "Ultra-fast and cheap with 1M context"),
         ModelType.GEMINI_FLASH: ("Gemini 2.5 Flash", "Fast with 1M context window"),
         ModelType.GEMINI_PRO: ("Gemini 2.5 Pro", "Most capable Gemini model"),
         # OpenAI GPT-5
@@ -230,15 +227,15 @@ async def get_available_models():
         ModelType.GPT_5_MINI: ("GPT-5 Mini", "Balanced speed and intelligence"),
         ModelType.GPT_5: ("GPT-5", "Most intelligent OpenAI model"),
         # OpenAI Legacy
-        ModelType.GPT_4O_MINI: ("GPT-4o Mini (Legacy)", "Fast and economical - Previous gen"),
-        ModelType.GPT_4O: ("GPT-4o (Legacy)", "Multimodal - Previous gen"),
+        ModelType.GPT_4O_MINI: ("GPT-4o Mini", "Fast and economical"),
+        ModelType.GPT_4O: ("GPT-4o", "Multimodal capable"),
         # Anthropic
         ModelType.CLAUDE_HAIKU: ("Claude Haiku 4.5", "Fastest Claude - Great for structured output"),
-        ModelType.CLAUDE_SONNET: ("Claude Sonnet 4.5", "Balanced Claude model"),
-        ModelType.CLAUDE_OPUS: ("Claude Opus 4.5", "Most capable Claude model"),
+        ModelType.CLAUDE_SONNET: ("Claude Sonnet 4.6", "Best combination of speed and intelligence"),
+        ModelType.CLAUDE_OPUS: ("Claude Opus 4.6", "Most intelligent model for complex tasks"),
         # Grok
         ModelType.GROK_FAST: ("Grok 4 Fast", "Fast with 2M context window"),
-        ModelType.GROK_4: ("Grok 4", "Most capable xAI model - 2M context"),
+        ModelType.GROK_4: ("Grok 4", "Most capable xAI model"),
     }
 
     for model_type in ModelType:
