@@ -1,0 +1,77 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scraper-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./backend/data:/app/data
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scraper-api.entrypoints=https"
+      - "traefik.http.routers.scraper-api.rule=Host(`scraper-api.pgdev.com.br`)"
+      - "traefik.http.routers.scraper-api.tls=true"
+      - "traefik.http.routers.scraper-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.scraper-api.middlewares=scraper-api-security@docker"
+      - "traefik.http.services.scraper-api.loadbalancer.server.port=8000"
+      # Security Headers
+      - "traefik.http.middlewares.scraper-api-security.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.scraper-api-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.scraper-api-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.scraper-api-security.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.scraper-api-security.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.scraper-api-security.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.scraper-api-security.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.scraper-api-security.headers.frameDeny=true"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://scraper-api.pgdev.com.br
+    container_name: scraper-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scraper.entrypoints=https"
+      - "traefik.http.routers.scraper.rule=Host(`scraper.pgdev.com.br`)"
+      - "traefik.http.routers.scraper.tls=true"
+      - "traefik.http.routers.scraper.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.scraper.middlewares=scraper-security@docker"
+      - "traefik.http.services.scraper.loadbalancer.server.port=3000"
+      # Security Headers
+      - "traefik.http.middlewares.scraper-security.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.scraper-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.scraper-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.scraper-security.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.scraper-security.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.scraper-security.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.scraper-security.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.scraper-security.headers.frameDeny=true"
+
+networks:
+  proxy:
+    external: true
