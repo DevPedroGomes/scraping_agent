@@ -16,6 +16,9 @@ async def lifespan(app: FastAPI):
     if deleted:
         print(f"Cache cleanup: removed {deleted} expired entries")
     yield
+    # Graceful shutdown: close persistent browser
+    from app.services.scraper_service import browser_pool
+    await browser_pool.close()
     print("Shutting down AI Web Scraper Showcase...")
 
 

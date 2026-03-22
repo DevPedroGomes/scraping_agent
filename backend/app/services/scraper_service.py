@@ -51,7 +51,10 @@ from app.core.constants import (
     STEALTH_ARGS,
     DEFAULT_ARGS,
     HARMFUL_ARGS,
+    CANVAS_NOISE_ARG,
+    WEBRTC_BLOCK_ARGS,
     get_random_user_agent,
+    get_browser_headers,
     generate_convincing_referer,
 )
 
@@ -194,172 +197,192 @@ async def _intercept_route(route):
         await route.continue_()
 
 
-class PageActionExecutor:
-    """Executes actions on page using Playwright with enhanced stealth mode."""
+# JS stealth script injected into every page
+_STEALTH_INIT_SCRIPT = """
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5]
+    });
+    Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en']
+    });
+    window.chrome = { runtime: {} };
+    const originalQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+            Promise.resolve({ state: Notification.permission }) :
+            originalQuery(parameters)
+    );
+"""
 
-    @staticmethod
+
+class BrowserPool:
+    """Manages a persistent browser instance for reuse across requests.
+
+    Inspired by Scrapling's page pooling approach: the browser is launched once
+    and reused. Each request gets a fresh context (isolated cookies/storage)
+    with a new page, avoiding the ~1-2s browser launch overhead per request.
+    """
+
+    def __init__(self):
+        self._playwright = None
+        self._browser = None
+        self._lock = asyncio.Lock()
+
+    def _build_launch_args(self, stealth_mode: bool) -> dict:
+        """Build browser launch arguments."""
+        launch_args = {"headless": True}
+        if stealth_mode:
+            flags = list(DEFAULT_ARGS + STEALTH_ARGS)
+            # Add canvas fingerprint noise and WebRTC protection
+            flags.append(CANVAS_NOISE_ARG)
+            flags.extend(WEBRTC_BLOCK_ARGS)
+            launch_args["args"] = flags
+            launch_args["ignore_default_args"] = list(HARMFUL_ARGS)
+        return launch_args
+
+    def _build_context_options(self, stealth_mode: bool) -> dict:
+        """Build browser context options with stealth settings."""
+        headers = get_browser_headers() if stealth_mode else {}
+        user_agent = headers.get("User-Agent") if stealth_mode else (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+
+        context_options = {
+            "viewport": {"width": 1920, "height": 1080},
+            "screen": {"width": 1920, "height": 1080},
+            "user_agent": user_agent,
+            "color_scheme": "dark",
+            "device_scale_factor": 2,
+            "is_mobile": False,
+            "has_touch": False,
+        }
+
+        if stealth_mode:
+            context_options.update({
+                "java_script_enabled": True,
+                "bypass_csp": True,
+                "ignore_https_errors": True,
+                "permissions": ["geolocation", "notifications"],
+            })
+            # Add extra headers from browserforge (Accept, sec-ch-ua, etc)
+            extra = {k: v for k, v in headers.items() if k != "User-Agent"}
+            if extra:
+                context_options["extra_http_headers"] = extra
+
+        return context_options
+
+    async def _ensure_browser(self, stealth_mode: bool):
+        """Launch browser if not already running. Thread-safe via asyncio.Lock."""
+        if self._browser and self._browser.is_connected():
+            return
+
+        async with self._lock:
+            # Double-check after acquiring lock
+            if self._browser and self._browser.is_connected():
+                return
+
+            if self._playwright is None:
+                self._playwright = await async_playwright().start()
+
+            launch_args = self._build_launch_args(stealth_mode)
+            self._browser = await self._playwright.chromium.launch(**launch_args)
+
+    async def _create_page(self, stealth_mode: bool):
+        """Create a fresh context + page with stealth settings.
+
+        Each request gets its own context for cookie/storage isolation
+        (like Scrapling does with proxy rotation mode).
+        """
+        await self._ensure_browser(stealth_mode)
+
+        context_options = self._build_context_options(stealth_mode)
+        context = await self._browser.new_context(**context_options)
+        page = await context.new_page()
+
+        if stealth_mode:
+            await page.route("**/*", _intercept_route)
+            await page.add_init_script(_STEALTH_INIT_SCRIPT)
+
+        return context, page
+
+    async def fetch_page(self, url: str, stealth_mode: bool = True) -> str:
+        """Fetch a page using the pooled browser."""
+        context, page = await self._create_page(stealth_mode)
+        try:
+            referer = generate_convincing_referer(url) if stealth_mode else None
+            goto_opts = {"wait_until": "networkidle", "timeout": 30000}
+            if referer:
+                goto_opts["referer"] = referer
+
+            await page.goto(url, **goto_opts)
+            return await page.content()
+        finally:
+            await context.close()
+
     async def execute_actions(
+        self,
         url: str,
         actions: list[PageAction],
-        stealth_mode: bool = True
+        stealth_mode: bool = True,
     ) -> tuple[str, int]:
-        """
-        Execute actions on page and return final HTML content.
-        Returns (html_content, actions_executed)
-        """
+        """Execute page actions and return HTML content."""
         actions_executed = 0
+        context, page = await self._create_page(stealth_mode)
+        try:
+            referer = generate_convincing_referer(url) if stealth_mode else None
+            goto_opts = {"wait_until": "networkidle", "timeout": 30000}
+            if referer:
+                goto_opts["referer"] = referer
 
-        async with async_playwright() as p:
-            launch_args = {
-                "headless": True,
-            }
-            if stealth_mode:
-                launch_args["args"] = list(DEFAULT_ARGS + STEALTH_ARGS)
-                launch_args["ignore_default_args"] = list(HARMFUL_ARGS)
+            await page.goto(url, **goto_opts)
 
-            browser = await p.chromium.launch(**launch_args)
-
-            user_agent = get_random_user_agent() if stealth_mode else (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-
-            context_options = {
-                "viewport": {"width": 1920, "height": 1080},
-                "screen": {"width": 1920, "height": 1080},
-                "user_agent": user_agent,
-                "color_scheme": "dark",
-                "device_scale_factor": 2,
-            }
-
-            if stealth_mode:
-                context_options.update({
-                    "java_script_enabled": True,
-                    "bypass_csp": True,
-                    "ignore_https_errors": True,
-                })
-
-            context = await browser.new_context(**context_options)
-            page = await context.new_page()
-
-            # Block unnecessary resources
-            if stealth_mode:
-                await page.route("**/*", _intercept_route)
-
-            if stealth_mode:
-                await page.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5]
-                    });
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['en-US', 'en']
-                    });
-                    window.chrome = { runtime: {} };
-                    const originalQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (parameters) => (
-                        parameters.name === 'notifications' ?
-                            Promise.resolve({ state: Notification.permission }) :
-                            originalQuery(parameters)
-                    );
-                """)
-
-            try:
-                referer = generate_convincing_referer(url) if stealth_mode else None
-                goto_opts = {"wait_until": "networkidle", "timeout": 30000}
-                if referer:
-                    goto_opts["referer"] = referer
-
-                await page.goto(url, **goto_opts)
-
-                for action in actions:
-                    try:
-                        if action.action == ActionType.CLICK:
-                            if action.selector:
-                                await page.click(action.selector, timeout=5000)
-                                await page.wait_for_timeout(action.wait_ms)
-                                actions_executed += 1
-
-                        elif action.action == ActionType.SCROLL:
-                            direction = action.value or "down"
-                            distance = 500 if direction == "down" else -500
-                            await page.evaluate(f"window.scrollBy(0, {distance})")
+            for action in actions:
+                try:
+                    if action.action == ActionType.CLICK:
+                        if action.selector:
+                            await page.click(action.selector, timeout=5000)
                             await page.wait_for_timeout(action.wait_ms)
                             actions_executed += 1
 
-                        elif action.action == ActionType.WAIT:
+                    elif action.action == ActionType.SCROLL:
+                        direction = action.value or "down"
+                        distance = 500 if direction == "down" else -500
+                        await page.evaluate(f"window.scrollBy(0, {distance})")
+                        await page.wait_for_timeout(action.wait_ms)
+                        actions_executed += 1
+
+                    elif action.action == ActionType.WAIT:
+                        await page.wait_for_timeout(action.wait_ms)
+                        actions_executed += 1
+
+                    elif action.action == ActionType.TYPE:
+                        if action.selector and action.value:
+                            await page.fill(action.selector, action.value, timeout=5000)
                             await page.wait_for_timeout(action.wait_ms)
                             actions_executed += 1
 
-                        elif action.action == ActionType.TYPE:
-                            if action.selector and action.value:
-                                await page.fill(action.selector, action.value, timeout=5000)
-                                await page.wait_for_timeout(action.wait_ms)
-                                actions_executed += 1
+                except Exception as e:
+                    print(f"Action {action.action} failed: {e}")
+                    continue
 
-                    except Exception as e:
-                        print(f"Action {action.action} failed: {e}")
-                        continue
+            return await page.content(), actions_executed
+        finally:
+            await context.close()
 
-                content = await page.content()
+    async def close(self):
+        """Shut down the browser and playwright. Called on app shutdown."""
+        if self._browser:
+            await self._browser.close()
+            self._browser = None
+        if self._playwright:
+            await self._playwright.stop()
+            self._playwright = None
 
-            finally:
-                await browser.close()
 
-        return content, actions_executed
-
-    @staticmethod
-    async def fetch_page(url: str, stealth_mode: bool = True) -> str:
-        """Simple page fetch with enhanced stealth mode."""
-        async with async_playwright() as p:
-            launch_args = {"headless": True}
-            if stealth_mode:
-                launch_args["args"] = list(DEFAULT_ARGS + STEALTH_ARGS)
-                launch_args["ignore_default_args"] = list(HARMFUL_ARGS)
-
-            browser = await p.chromium.launch(**launch_args)
-
-            user_agent = get_random_user_agent() if stealth_mode else (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-
-            context_options = {
-                "viewport": {"width": 1920, "height": 1080},
-                "screen": {"width": 1920, "height": 1080},
-                "user_agent": user_agent,
-                "color_scheme": "dark",
-                "device_scale_factor": 2,
-            }
-
-            if stealth_mode:
-                context_options.update({
-                    "java_script_enabled": True,
-                    "bypass_csp": True,
-                    "ignore_https_errors": True,
-                })
-
-            context = await browser.new_context(**context_options)
-            page = await context.new_page()
-
-            if stealth_mode:
-                await page.route("**/*", _intercept_route)
-                await page.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-                    window.chrome = { runtime: {} };
-                """)
-
-            try:
-                referer = generate_convincing_referer(url) if stealth_mode else None
-                goto_opts = {"wait_until": "networkidle", "timeout": 30000}
-                if referer:
-                    goto_opts["referer"] = referer
-
-                await page.goto(url, **goto_opts)
-                content = await page.content()
-            finally:
-                await browser.close()
-
-        return content
+# Module-level singleton — shared across all requests
+browser_pool = BrowserPool()
 
 
 async def _retry_with_backoff(func, max_retries: int = 3, base_delay: float = 1.0):
@@ -560,7 +583,7 @@ class ScraperService:
             default_ttl=3600,
         )
         self.validator = OutputValidator()
-        self.action_executor = PageActionExecutor()
+        self.browser = browser_pool
         self.html_converter = HTMLToMarkdown()
         self.llm_providers = LLMProviders()
         self.smart_router = SmartRouter()
@@ -669,11 +692,11 @@ class ScraperService:
             # --- FETCH ---
             fetch_start = time.time()
             if request.actions:
-                page_content, actions_executed = await self.action_executor.execute_actions(
+                page_content, actions_executed = await self.browser.execute_actions(
                     request.url, request.actions, request.stealth_mode
                 )
             else:
-                page_content = await self.action_executor.fetch_page(
+                page_content = await self.browser.fetch_page(
                     request.url, request.stealth_mode
                 )
             fetch_time = round(time.time() - fetch_start, 3)
