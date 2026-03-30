@@ -2,23 +2,34 @@ import { Scraper } from "@/components/scraper";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-background/95">
-      <div className="container mx-auto px-4 py-12">
-        <header className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm mb-4">
+    <main className="min-h-screen bg-white">
+      {/* Navbar */}
+      <header className="sticky top-0 z-50 w-full border-b border-neutral-200 bg-white/80 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto flex h-14 items-center px-6 sm:px-8">
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-lg object-cover" />
+            <span className="font-semibold tracking-tight text-neutral-900">AI Web Scraper</span>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-6 sm:px-8 py-16">
+        <header className="text-center mb-14">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-medium font-mono mb-6">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             AI-Powered Web Scraping
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          <h1 className="text-5xl md:text-6xl font-semibold tracking-tighter leading-[0.9] text-neutral-900 mb-6">
             Intelligent
-            <span className="text-primary"> Web Scraper</span>
+            <br />
+            <span className="text-emerald-600">Web Scraper</span>
           </h1>
 
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-lg text-neutral-500 leading-relaxed max-w-2xl mx-auto">
             Extract structured data from any website using artificial intelligence.
             Just provide the URL and describe what you want to extract.
           </p>
@@ -26,15 +37,15 @@ export default function Home() {
 
         <Scraper />
 
-        <footer className="mt-16 text-center text-sm text-muted-foreground">
+        <footer className="border-t border-neutral-200 mt-16 pt-8 pb-8 text-center">
           <div className="space-y-2">
-            <p>
+            <p className="text-sm text-neutral-500">
               Built with{" "}
-              <span className="font-medium text-foreground">Next.js</span>,{" "}
-              <span className="font-medium text-foreground">FastAPI</span> and{" "}
-              <span className="font-medium text-foreground">Playwright</span>
+              <span className="font-medium text-neutral-900">Next.js</span>,{" "}
+              <span className="font-medium text-neutral-900">FastAPI</span> and{" "}
+              <span className="font-medium text-neutral-900">Playwright</span>
             </p>
-            <p className="text-xs">
+            <p className="text-xs text-neutral-400 font-mono">
               Multi-Provider AI (OpenAI, DeepSeek, Gemini, Claude, Grok) | 67% Token Reduction | Stealth Mode
             </p>
           </div>

@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: scraper-api
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
     env_file:
       - .env
     volumes:
@@ -43,6 +47,10 @@ services:
         - NEXT_PUBLIC_API_URL=https://scraper-api.pgdev.com.br
     container_name: scraper-frontend
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     depends_on:
       backend:
         condition: service_healthy

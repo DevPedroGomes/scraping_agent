@@ -30,7 +30,7 @@ export function StatusBar({ health, session }: StatusBarProps) {
             <span>Scrapes:</span>
             <span
               className={`font-mono ${
-                scrapesExhausted ? "text-red-400 font-semibold" : ""
+                scrapesExhausted ? "text-red-600 font-semibold" : ""
               }`}
             >
               {session.scrape_count}/{session.max_scrapes}

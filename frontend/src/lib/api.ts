@@ -16,30 +16,43 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
-    if (this.sessionId) {
-      headers["X-Session-Id"] = this.sessionId;
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (this.sessionId) {
+        headers["X-Session-Id"] = this.sessionId;
+      }
+
+      if (options.headers) {
+        const incomingHeaders = options.headers as Record<string, string>;
+        Object.assign(headers, incomingHeaders);
+      }
+
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Request failed: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("Request timed out after 5 minutes. Please try again or use a simpler query.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    if (options.headers) {
-      const incomingHeaders = options.headers as Record<string, string>;
-      Object.assign(headers, incomingHeaders);
-    }
-
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Request failed: ${response.status}`);
-    }
-
-    return response.json();
   }
 
   setSessionId(sessionId: string) {

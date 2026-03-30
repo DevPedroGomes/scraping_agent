@@ -212,8 +212,8 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
 
           {/* API Key - hidden for Groq, shown for others */}
           {isGroq ? (
-            <div className="rounded-md border border-green-600/30 bg-green-950/20 p-3">
-              <p className="text-sm text-green-400">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-sm text-emerald-700">
                 Free Model — No API key required!
               </p>
             </div>
@@ -368,7 +368,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                   <Select
                     value={newAction.action}
                     onValueChange={(v) =>
@@ -447,7 +447,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
                   <Input
                     placeholder="Field name"
                     value={newField.name}
