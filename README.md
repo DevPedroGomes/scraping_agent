@@ -1,215 +1,196 @@
-# AI Web Scraper v3.0
+# AI Web Scraper
 
-A full-stack web scraping application powered by multiple LLM providers. Users provide a URL and describe what data they want to extract in natural language. The system uses AI to understand the page structure and return structured data.
-
-## What's New in v3.0
-
-- **6 AI Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
-- **19+ Models**: From FREE ($0/1M tokens) to premium ($25/1M tokens)
-- **FREE Tier**: Zero-cost scraping with Groq open source models (Llama, Mixtral, Gemma)
-- **67% Token Reduction**: HTML to Markdown conversion saves costs
-- **Stealth Mode**: Anti-bot detection bypass with Playwright
-- **Smart Routing**: Auto-select models by cost tier (free/budget/standard/premium)
-- **Real-time Cost Tracking**: See tokens used and estimated cost per request
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Multi-Provider AI** | Choose from Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, or Grok |
-| **Intelligent Extraction** | Natural language prompts to extract any data |
-| **Stealth Mode** | Bypass bot detection with browser fingerprint evasion |
-| **Markdown Conversion** | Reduce tokens by 67% with HTML to Markdown |
-| **Smart Routing** | Auto-select cheapest model for your quality tier |
-| **Structured Output** | Define expected schema for validated results |
-| **Page Actions** | Execute clicks, scrolls, waits before scraping |
-| **Smart Caching** | Reduce costs by caching page content |
-| **Cost Tracking** | Real-time token usage and cost estimates |
-
-## Supported Models & Pricing
-
-### FREE Tier (Zero Cost)
-| Model | Provider | Input/Output per 1M tokens |
-|-------|----------|---------------------------|
-| Llama 3.3 70B | Groq | $0.00 / $0.00 |
-| Mixtral 8x7B | Groq | $0.00 / $0.00 |
-| Llama 3.1 8B | Groq | $0.00 / $0.00 |
-| Gemma 2 9B | Groq | $0.00 / $0.00 |
-
-### Budget Tier (Cheapest Paid)
-| Model | Provider | Input/Output per 1M tokens |
-|-------|----------|---------------------------|
-| GPT-5 Nano | OpenAI | $0.05 / $0.40 |
-| Gemini Flash Lite | Google | $0.10 / $0.40 |
-| DeepSeek Chat | DeepSeek | $0.14 / $0.28 |
-| Grok 4 Fast | xAI | $0.20 / $0.50 |
-| DeepSeek V3 | DeepSeek | $0.27 / $1.10 |
-
-### Standard Tier (Balanced)
-| Model | Provider | Input/Output per 1M tokens |
-|-------|----------|---------------------------|
-| GPT-5 Mini | OpenAI | $0.25 / $2.00 |
-| Gemini 2.5 Flash | Google | $0.30 / $2.50 |
-| Claude Haiku 4.5 | Anthropic | $1.00 / $5.00 |
-
-### Premium Tier (Best Quality)
-| Model | Provider | Input/Output per 1M tokens |
-|-------|----------|---------------------------|
-| GPT-5 | OpenAI | $1.25 / $10.00 |
-| Gemini 2.5 Pro | Google | $1.25 / $2.50 |
-| Claude Sonnet 4.5 | Anthropic | $3.00 / $15.00 |
-| Grok 4 | xAI | $3.00 / $15.00 |
-| Claude Opus 4.5 | Anthropic | $5.00 / $25.00 |
+A full-stack application that extracts structured data from any website using AI. Users provide a URL and a natural language prompt describing what to extract; the system renders the page with Playwright, converts it to Markdown, sends it to the chosen LLM provider, and returns validated JSON.
 
 ## Architecture
 
-```
-ai-web-scraper/
-├── backend/                 # FastAPI REST API
-│   └── app/
-│       ├── api/routes.py    # HTTP endpoints
-│       ├── core/
-│       │   ├── config.py    # Environment configuration
-│       │   └── session_manager.py  # Session and rate limiting
-│       ├── models/schemas.py       # Pydantic models (19+ AI models)
-│       └── services/
-│           └── scraper_service.py  # Multi-provider scraping logic
-│               ├── HTMLToMarkdown      # 67% token reduction
-│               ├── SmartRouter         # Cost-tier model selection
-│               ├── PageCache           # TTL-based caching
-│               ├── OutputValidator     # Schema validation
-│               ├── PageActionExecutor  # Playwright stealth mode
-│               └── LLMProviders        # Groq, OpenAI, DeepSeek, Gemini, Anthropic, Grok
-│
-└── frontend/                # Next.js 16 client
-    └── src/
-        ├── app/             # Pages
-        ├── components/      # React components (shadcn/ui)
-        │   └── scraper/
-        │       ├── scraper-form.tsx    # Multi-provider model selector
-        │       ├── scraper-result.tsx  # Cost & token display
-        │       └── status-bar.tsx      # API health status
-        ├── hooks/           # Custom React hooks
-        ├── lib/api.ts       # API client
-        └── types/           # TypeScript definitions (19+ models)
-```
+The system is split into two independently deployed containers behind a Traefik reverse proxy:
 
-## How It Works
+- **Frontend** (Next.js 16) -- handles user input, model selection, API key entry, and result display with cost breakdown.
+- **Backend** (FastAPI) -- manages sessions, rate limiting, browser pooling, HTML processing, multi-provider LLM dispatch, caching, and output validation.
+
+The backend maintains a single persistent Chromium instance via `BrowserPool`. Each scrape request gets an isolated browser context (separate cookies and storage) to avoid cross-request leakage while skipping the 1-2s browser launch overhead. Stealth mode injects 59 anti-detection flags, blocks unnecessary resource types, and spoofs fingerprints.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         AI WEB SCRAPER v3.0 FLOW                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────────────┐
-│  USER    │     │ FRONTEND │     │ BACKEND  │     │    AI PROVIDERS      │
-│          │     │ (Next.js)│     │ (FastAPI)│     │ Groq/OpenAI/DeepSeek/│
-│          │     │          │     │          │     │ Gemini/Anthropic/Grok│
-└────┬─────┘     └────┬─────┘     └────┬─────┘     └──────────┬───────────┘
-     │                │                │                      │
-     │  1. Enter:     │                │                      │
-     │   - URL        │                │                      │
-     │   - Prompt     │                │                      │
-     │   - Provider   │                │                      │
-     │   - API Key    │                │                      │
-     │   - Options    │                │                      │
-     │───────────────>│                │                      │
-     │                │                │                      │
-     │                │  2. POST       │                      │
-     │                │     /scrape    │                      │
-     │                │───────────────>│                      │
-     │                │                │                      │
-     │                │                │  3. Check cache      │
-     │                │                │─────┐                │
-     │                │                │     │ HIT: skip      │
-     │                │                │<────┘ fetch          │
-     │                │                │                      │
-     │                │                │  4. Stealth Mode     │
-     │                │                │     Playwright       │
-     │                │                │─────┐                │
-     │                │                │     │ Execute        │
-     │                │                │<────┘ actions        │
-     │                │                │                      │
-     │                │                │  5. HTML → Markdown  │
-     │                │                │     (67% reduction)  │
-     │                │                │─────┐                │
-     │                │                │<────┘                │
-     │                │                │                      │
-     │                │                │  6. Route to         │
-     │                │                │     provider         │
-     │                │                │─────────────────────>│
-     │                │                │                      │
-     │                │                │  7. Structured       │
-     │                │                │     JSON response    │
-     │                │                │<─────────────────────│
-     │                │                │                      │
-     │                │                │  8. Validate &       │
-     │                │                │     calculate cost   │
-     │                │                │─────┐                │
-     │                │                │<────┘                │
-     │                │                │                      │
-     │                │  9. Result +   │                      │
-     │                │     metadata   │                      │
-     │                │<───────────────│                      │
-     │                │                │                      │
-     │  10. Display   │                │                      │
-     │   - Data       │                │                      │
-     │   - Tokens     │                │                      │
-     │   - Cost       │                │                      │
-     │<───────────────│                │                      │
+frontend/                        backend/
+  src/                             app/
+    app/           (pages)           api/routes.py        (endpoints)
+    components/    (UI)              core/config.py       (settings)
+    hooks/         (state)           core/session_manager.py (rate limits)
+    lib/api.ts     (HTTP client)     core/cache.py        (SQLite cache)
+    types/         (TS defs)         core/url_validator.py (SSRF protection)
+                                     models/schemas.py    (Pydantic models)
+                                     services/scraper_service.py
+                                       HTMLToMarkdown
+                                       BrowserPool
+                                       SmartRouter
+                                       OutputValidator
+                                       LLMProviders
 ```
+
+## Pipeline
+
+```mermaid
+flowchart TD
+    A[User submits URL + prompt + model] --> B{Cache hit?}
+    B -- Yes --> K[Return cached response]
+    B -- No --> C[Playwright renders page]
+    C --> D{Page actions?}
+    D -- Yes --> E[Execute click / scroll / type / wait]
+    E --> F[Capture final HTML]
+    D -- No --> F
+    F --> G[Strip scripts, nav, forms via BeautifulSoup]
+    G --> H[Convert HTML to Markdown -- 67% token reduction]
+    H --> I[Truncate to model context window]
+    I --> J[Send to LLM provider with extraction prompt]
+    J --> L[Parse JSON response]
+    L --> M{Output schema defined?}
+    M -- Yes --> N[Validate against schema]
+    M -- No --> O[Return raw extracted data]
+    N --> O
+    O --> P[Cache full response in SQLite]
+    P --> Q[Return JSON + tokens used + cost estimate]
+```
+
+### Stage breakdown
+
+1. **URL validation** -- Checks the target URL against SSRF rules before any network request.
+2. **Cache lookup** -- SQLite-backed cache keyed on URL + actions + prompt + model. Configurable TTL (default 60 min).
+3. **Page fetch** -- Playwright Chromium with optional stealth mode (webdriver spoofing, plugin emulation, CSP bypass, resource blocking, randomized user-agent and referer). Browser instance is pooled across requests; each request gets a fresh context.
+4. **Page actions** -- Optional pre-scrape interactions: click a selector, scroll up/down, type into an input, or wait a fixed duration. Useful for SPAs and lazy-loaded content.
+5. **HTML cleanup** -- BeautifulSoup removes script, style, nav, footer, header, aside, iframe, form, and other non-content tags.
+6. **Markdown conversion** -- Markdownify converts the cleaned HTML to Markdown, reducing token count by approximately 67%.
+7. **Content truncation** -- Content is truncated at a clean line boundary to fit within 80% of the model's context window, reserving space for the prompt and output.
+8. **LLM extraction** -- The content and prompt are sent to the selected provider. All calls use retry with exponential backoff (3 attempts), except auth errors which fail immediately.
+9. **Output validation** -- If an output schema was provided, the JSON result is validated for required fields and correct types.
+10. **Cost estimation** -- Tokens are split 70/30 input/output and multiplied by the model's per-million pricing.
+
+## Multi-Provider Support
+
+Six providers are supported. Users supply their own API key per request (or the server can hold default keys for Groq and OpenAI).
+
+| Provider | Models | API Key Format | Integration |
+|----------|--------|---------------|-------------|
+| Groq | Llama 3.3 70B, Llama 3.1 8B | `gsk_...` | OpenAI-compatible endpoint |
+| OpenAI | GPT-5, GPT-5 Mini, GPT-5 Nano, GPT-4o, GPT-4o Mini | `sk-...` | Native OpenAI SDK |
+| DeepSeek | DeepSeek V3.2 (Chat) | `sk-...` | OpenAI-compatible endpoint |
+| Google | Gemini 2.5 Pro, Flash, Flash Lite | `AI...` | Google GenAI SDK |
+| Anthropic | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | `sk-ant-...` | Native Anthropic SDK |
+| xAI | Grok 4, Grok 4 Fast | `xai-...` | OpenAI-compatible endpoint |
+
+### Pricing tiers
+
+| Tier | Models | Input / Output per 1M tokens |
+|------|--------|------------------------------|
+| Free | Llama 3.3 70B, Llama 3.1 8B | $0.00 / $0.00 |
+| Budget | DeepSeek V3.2, Gemini Flash Lite, GPT-5 Nano, GPT-4o Mini, Grok 4 Fast | $0.10-$0.28 / $0.40-$1.50 |
+| Standard | Gemini 2.5 Flash, GPT-5 Mini, Claude Haiku 4.5 | $0.30-$1.00 / $2.50-$5.00 |
+| Premium | GPT-5, Gemini 2.5 Pro, Claude Sonnet 4.6, Grok 4, Claude Opus 4.6 | $1.25-$5.00 / $10.00-$25.00 |
+
+Smart routing auto-selects the first model in a tier when `cost_tier` is set instead of a specific model.
 
 ## Tech Stack
 
-### Backend
+| Component | Technology | Role |
+|-----------|-----------|------|
+| API server | FastAPI (Python 3.11) | Async REST API with Pydantic validation |
+| Browser engine | Playwright Chromium | Headless rendering with stealth anti-detection |
+| HTML processing | BeautifulSoup + Markdownify | Tag stripping and Markdown conversion |
+| Cache | SQLite (via custom wrapper) | Persistent response cache with TTL |
+| Session management | cachetools TTLCache | In-memory session store with auto-expiry |
+| LLM clients | OpenAI SDK, Anthropic SDK, Google GenAI | Provider-specific API calls |
+| Frontend framework | Next.js 16, React 19 | App Router with server components |
+| Styling | Tailwind CSS 4 | Utility-first CSS |
+| UI components | shadcn/ui | Accessible component library |
+| Notifications | Sonner | Toast messages |
+| Type safety | TypeScript | Frontend type definitions |
+| Reverse proxy | Traefik v3 | TLS termination, routing, security headers |
+| Containerization | Docker + Docker Compose | Multi-container deployment |
 
-| Technology | Purpose |
-|------------|---------|
-| FastAPI | REST API framework with async support |
-| Playwright | Headless browser with stealth mode |
-| OpenAI SDK | GPT-5, GPT-4o models |
-| Anthropic SDK | Claude Haiku, Sonnet, Opus |
-| Google GenAI | Gemini Flash, Pro models |
-| Markdownify | HTML to Markdown (67% token reduction) |
-| BeautifulSoup | HTML parsing and cleaning |
-| Pydantic | Request/response validation |
-| cachetools | TTL-based page content caching |
+## Getting Started
 
-### Frontend
+### Prerequisites
 
-| Technology | Purpose |
-|------------|---------|
-| Next.js 16 | React framework with App Router |
-| React 19 | UI library |
-| TypeScript | Type safety |
-| Tailwind CSS 4 | Utility-first styling |
-| shadcn/ui | Component library |
-| Sonner | Toast notifications |
+- Docker and Docker Compose
+- At least one AI provider API key (or use Groq free tier)
+
+### Environment Variables
+
+Backend `.env`:
+
+```
+DEBUG=false
+MAX_CONCURRENT_SESSIONS=35
+MAX_REQUESTS_PER_MINUTE=10
+SESSION_TIMEOUT_MINUTES=30
+MAX_SCRAPES_PER_SESSION=5
+CACHE_DB_PATH=scrape_cache.db
+FRONTEND_URL=http://localhost:3000
+# DEFAULT_GROQ_API_KEY=gsk_...
+# DEFAULT_OPENAI_API_KEY=sk-...
+```
+
+Frontend (build arg or `.env.local`):
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Running with Docker
+
+```bash
+docker compose up -d
+```
+
+The compose file builds both containers. The frontend waits for the backend health check before starting. Access the UI at the frontend URL and the interactive API docs at `{backend_url}/docs`.
+
+### Running locally (without Docker)
+
+Backend:
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+playwright install chromium
+uvicorn app.main:app --reload --port 8000
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/health` | Server status, version, features |
-| POST | `/api/v1/session` | Create new session |
-| GET | `/api/v1/session/{id}` | Get session info |
-| DELETE | `/api/v1/session/{id}` | End session |
-| POST | `/api/v1/scrape` | Execute scraping |
-| GET | `/api/v1/models` | List all 19+ models with pricing |
+| `GET` | `/api/v1/health` | Server status, active sessions, version, enabled features |
+| `POST` | `/api/v1/session` | Create a new session |
+| `GET` | `/api/v1/session/{id}` | Get session info (request count, scrape count) |
+| `DELETE` | `/api/v1/session/{id}` | End a session |
+| `POST` | `/api/v1/scrape` | Execute a scrape request |
+| `GET` | `/api/v1/models` | List all available models with pricing |
+| `GET` | `/api/v1/examples` | List pre-cached example scrapes |
 
-### Scrape Request
+### POST /api/v1/scrape
+
+Request body:
 
 ```json
 {
   "url": "https://example.com",
   "prompt": "Extract all product names and prices",
-  "model": "deepseek-v3",
-  "api_key": "your-provider-api-key",
-  "cost_tier": "budget",
+  "model": "deepseek-chat",
+  "api_key": "sk-...",
   "stealth_mode": true,
   "use_markdown": true,
   "use_cache": true,
   "cache_ttl_minutes": 60,
+  "cost_tier": "budget",
   "actions": [
     {"action": "scroll", "value": "down", "wait_ms": 1000},
     {"action": "click", "selector": ".load-more", "wait_ms": 2000}
@@ -221,199 +202,17 @@ ai-web-scraper/
 }
 ```
 
-### Scrape Response
+Response includes: extracted `data`, `tokens_used`, `estimated_cost`, `cache_hit`, `token_reduction` percentage, `validation_passed`, timing breakdown (`fetch_time`, `parse_time`, `llm_time`), and `scrapes_remaining`.
 
-```json
-{
-  "success": true,
-  "data": {
-    "products": ["Product A", "Product B"],
-    "total_count": 2
-  },
-  "execution_time": 3.45,
-  "timestamp": "2026-01-29T10:30:00Z",
-  "model_used": "deepseek-v3",
-  "provider_used": "deepseek",
-  "tokens_used": 1523,
-  "estimated_cost": 0.0018,
-  "cache_hit": false,
-  "markdown_used": true,
-  "token_reduction": 67.5,
-  "actions_executed": 2,
-  "validation_passed": true,
-  "validation_errors": null
-}
-```
+## Rate Limits
 
-## New Features in v3.0
-
-### Stealth Mode
-Bypass bot detection with browser fingerprint evasion:
-- Hides `navigator.webdriver` property
-- Spoofs plugins and languages
-- Emulates real Chrome browser
-- Bypasses CSP restrictions
-
-### HTML to Markdown Conversion
-Reduce token costs by ~67%:
-- Removes scripts, styles, navigation
-- Converts to clean Markdown
-- Preserves semantic structure
-- Shows reduction percentage in response
-
-### Smart Routing
-Auto-select the best model for your budget:
-
-| Cost Tier | Default Model | Use Case |
-|-----------|---------------|----------|
-| `free` | Llama 3.3 70B | Zero-cost extractions |
-| `budget` | DeepSeek Chat | Simple extractions |
-| `standard` | DeepSeek V3 | Balanced quality |
-| `premium` | GPT-5 | Complex extractions |
-
-### Multi-Provider Support
-Use your preferred AI provider:
-
-| Provider | API Key Format | Models |
-|----------|----------------|--------|
-| Groq | `gsk_...` | Llama 3.3 70B, Mixtral 8x7B, Llama 3.1 8B, Gemma 2 9B (FREE) |
-| OpenAI | `sk-...` | GPT-5, GPT-4o |
-| DeepSeek | `sk-...` | DeepSeek V3, Chat |
-| Google | `AI...` | Gemini Flash, Pro |
-| Anthropic | `sk-ant-...` | Claude Haiku, Sonnet, Opus |
-| xAI | `xai-...` | Grok 4, Grok 4 Fast |
-
-## Page Actions
-
-Execute actions before scraping to handle dynamic content:
-
-| Action | Parameters | Description |
-|--------|------------|-------------|
-| `click` | `selector` | Click on element |
-| `scroll` | `value` (up/down) | Scroll the page |
-| `wait` | `wait_ms` | Wait for specified time |
-| `type` | `selector`, `value` | Type text into input |
-
-## Output Schema
-
-Define expected fields for validated output:
-
-| Property | Values | Description |
-|----------|--------|-------------|
-| `name` | string | Field name in output |
-| `type` | string, number, boolean, array, object | Expected type |
-| `description` | string | Hint for the LLM |
-| `required` | boolean | Whether field is mandatory |
-
-## Rate Limiting
-
-| Control | Value | Purpose |
-|---------|-------|---------|
-| Max requests/minute | 10 | Prevent rapid-fire requests |
-| Max concurrent sessions | 35 | Limit server load |
-| Session timeout | 30 min | Auto-cleanup inactive sessions |
-| Page caching | 60 min default | Reduce redundant fetches |
-
-## Setup
-
-### Backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-playwright install chromium
-uvicorn app.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Access at:
-- Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
-
-## Environment Variables
-
-### Backend (`.env`)
-```bash
-# Server
-DEBUG=false
-
-# Rate Limiting
-MAX_CONCURRENT_SESSIONS=35
-MAX_REQUESTS_PER_MINUTE=10
-SESSION_TIMEOUT_MINUTES=30
-
-# CORS - Set to your frontend URL in production
-FRONTEND_URL=http://localhost:3000
-
-# Optional: Default API key for demo
-# DEFAULT_OPENAI_API_KEY=sk-...
-```
-
-### Frontend (`.env.local`)
-```bash
-# Backend API URL - Set to your backend URL in production
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-## Deployment
-
-### Railway (Recommended)
-
-Both frontend and backend have `railway.json` configured for one-click deploy.
-
-1. Connect your GitHub repo to Railway
-2. Create two services: `backend` and `frontend`
-3. Set root directories: `backend` and `frontend`
-4. Add environment variables
-5. Generate domains and update `FRONTEND_URL` / `NEXT_PUBLIC_API_URL`
-
-### Docker (Backend)
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y \
-    wget gnupg ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN playwright install chromium --with-deps
-
-COPY . .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Vercel (Frontend)
-
-Deploy directly to Vercel. Set `NEXT_PUBLIC_API_URL` to your backend URL.
-
-## Version History
-
-- **v3.0.0**: Multi-provider support (6 providers, 19+ models), FREE tier with Groq open source models, stealth mode, HTML to Markdown conversion, smart routing, cost tracking
-- **v2.0.0**: Added structured output, page caching, and page actions
-- **v1.0.0**: Initial release with basic scraping
-
-## Cost Optimization Tips
-
-1. **Use FREE Tier**: Groq models (Llama 3.3 70B, Mixtral) are completely free and rival GPT-4 quality
-2. **Use Markdown Conversion**: Reduces tokens by ~67%
-3. **Enable Caching**: Avoid re-fetching same pages
-4. **Choose Budget Tier**: If paid, DeepSeek V3 offers 95% of GPT-4 quality at 5% cost
-5. **Use Smart Routing**: Let the system pick the cheapest model for your tier
-6. **Define Output Schema**: More precise prompts = fewer tokens
+| Control | Value |
+|---------|-------|
+| Max concurrent sessions | 35 |
+| Max requests per minute per session | 10 |
+| Max scrapes per session | 5 (pre-cached examples do not count) |
+| Session timeout | 30 minutes of inactivity |
+| Default cache TTL | 60 minutes |
 
 ## License
 
