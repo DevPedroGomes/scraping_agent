@@ -47,13 +47,18 @@ class SQLiteCache:
         return conn
 
     @staticmethod
-    def _generate_key(url: str, actions: list | None, prompt: str, model: str) -> str:
-        """Generate cache key from URL + actions + prompt + model."""
-        actions_str = json.dumps(actions, sort_keys=True) if actions else ""
-        key_data = f"{url}:{actions_str}:{prompt}:{model}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+    def _generate_key(url: str, actions: list | None, prompt: str, model: str, api_key: str) -> str:
+        """Generate cache key from URL + actions + prompt + model + scoped api_key.
 
-    def get(self, url: str, actions: list | None, prompt: str, model: str) -> tuple[dict | None, bool]:
+        Scoping by api_key prevents one user's cached scrape from being served
+        to another user (which could leak content the other user paid to scrape).
+        """
+        actions_str = json.dumps(actions, sort_keys=True) if actions else ""
+        key_scope = hashlib.sha256((api_key or "").encode()).hexdigest()[:16]
+        key_data = f"{url}:{actions_str}:{prompt}:{model}:{key_scope}"
+        return hashlib.sha256(key_data.encode()).hexdigest()
+
+    def get(self, url: str, actions: list | None, prompt: str, model: str, api_key: str) -> tuple[dict | None, bool]:
         """
         Get cached response.
 
@@ -61,7 +66,7 @@ class SQLiteCache:
             (response_dict, True) on hit
             (None, False) on miss or expired
         """
-        key = self._generate_key(url, actions, prompt, model)
+        key = self._generate_key(url, actions, prompt, model, api_key)
         with self._lock:
             conn = self._connect()
             try:
@@ -96,11 +101,12 @@ class SQLiteCache:
         actions: list | None,
         prompt: str,
         model: str,
+        api_key: str,
         response_data: dict[str, Any],
         ttl: int | None = None,
     ):
-        """Cache a complete response."""
-        key = self._generate_key(url, actions, prompt, model)
+        """Cache a complete response (scoped per api_key)."""
+        key = self._generate_key(url, actions, prompt, model, api_key)
         ttl = ttl or self.default_ttl
         with self._lock:
             conn = self._connect()

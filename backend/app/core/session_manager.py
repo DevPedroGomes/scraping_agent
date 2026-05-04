@@ -6,6 +6,11 @@ from cachetools import TTLCache
 from app.core.config import get_settings
 
 
+# Per-IP session creation rate limit (sliding window)
+_IP_CREATE_WINDOW_MINUTES = 10
+_IP_CREATE_MAX = 5
+
+
 class SessionManager:
     def __init__(self):
         settings = get_settings()
@@ -16,6 +21,8 @@ class SessionManager:
         self._locks: Dict[str, asyncio.Lock] = {}
         self._request_counts: Dict[str, int] = {}
         self._last_requests: Dict[str, datetime] = {}
+        # Track session-creation timestamps per IP for sliding-window limiter
+        self._ip_create_buckets: Dict[str, list[datetime]] = {}
 
     @property
     def active_sessions_count(self) -> int:
@@ -29,7 +36,25 @@ class SessionManager:
     def max_scrapes_per_session(self) -> int:
         return get_settings().max_scrapes_per_session
 
-    def create_session(self) -> str:
+    def check_ip_create_limit(self, ip: str) -> bool:
+        """Return True if the IP is allowed to create a new session (sliding 10-min window)."""
+        if not ip:
+            return True
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=_IP_CREATE_WINDOW_MINUTES)
+        bucket = self._ip_create_buckets.get(ip, [])
+        # prune old timestamps
+        bucket = [t for t in bucket if t > cutoff]
+        self._ip_create_buckets[ip] = bucket
+        return len(bucket) < _IP_CREATE_MAX
+
+    def _record_ip_create(self, ip: str) -> None:
+        if not ip:
+            return
+        now = datetime.now(timezone.utc)
+        self._ip_create_buckets.setdefault(ip, []).append(now)
+
+    def create_session(self, creator_ip: str | None = None) -> str:
         if len(self._sessions) >= self.max_sessions:
             self._cleanup_oldest_session()
 
@@ -40,10 +65,12 @@ class SessionManager:
             "last_activity": now,
             "requests_count": 0,
             "scrape_count": 0,
+            "creator_ip": creator_ip,
         }
         self._locks[session_id] = asyncio.Lock()
         self._request_counts[session_id] = 0
         self._last_requests[session_id] = now
+        self._record_ip_create(creator_ip)
 
         return session_id
 

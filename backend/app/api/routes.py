@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends, Request
 from typing import Annotated
 from app.models.schemas import (
     ScrapeRequest,
@@ -21,17 +21,32 @@ from app.services.scraper_service import scraper_service
 router = APIRouter()
 
 
-async def get_session_id(x_session_id: Annotated[str | None, Header()] = None) -> str:
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP, honoring x-real-ip from Traefik."""
+    return request.headers.get("x-real-ip") or (
+        request.client.host if request.client else ""
+    )
+
+
+async def get_session_id(
+    x_session_id: Annotated[str | None, Header()] = None,
+) -> str:
     """
-    Get or create session ID from header.
-    If no session ID provided or session expired, creates a new one.
+    Resolve session ID from X-Session-Id header.
+    Rejects missing or unknown sessions with 401. Never auto-creates.
     """
     if not x_session_id:
-        return session_manager.create_session()
+        raise HTTPException(
+            status_code=401,
+            detail="Missing X-Session-Id header — POST /api/v1/session first",
+        )
 
     session = session_manager.get_session(x_session_id)
     if not session:
-        return session_manager.create_session()
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired or invalid — create a new one",
+        )
 
     return x_session_id
 
@@ -84,15 +99,23 @@ async def health_check():
         }
     }
 )
-async def create_session():
+async def create_session(request: Request):
     """Create a new session."""
+    client_ip = _client_ip(request)
+
+    if not session_manager.check_ip_create_limit(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many sessions created from this IP. Try again later.",
+        )
+
     if session_manager.active_sessions_count >= session_manager.max_sessions:
         raise HTTPException(
             status_code=503,
             detail="Maximum number of sessions reached. Please try again later."
         )
 
-    session_id = session_manager.create_session()
+    session_id = session_manager.create_session(creator_ip=client_ip)
     return _build_session_info(session_id)
 
 
@@ -115,8 +138,31 @@ async def get_session(session_id: str):
     description="Close and delete an existing session.",
     responses={404: {"description": "Session not found"}}
 )
-async def delete_session(session_id: str):
-    """Delete a session by ID."""
+async def delete_session(
+    session_id: str,
+    request: Request,
+    x_session_id: Annotated[str | None, Header()] = None,
+):
+    """Delete a session by ID. Requires X-Session-Id header to match path param
+    AND the request to come from the IP that originally created the session."""
+    if not x_session_id or x_session_id != session_id:
+        raise HTTPException(
+            status_code=403,
+            detail="X-Session-Id header must match the session being deleted",
+        )
+
+    session = session_manager.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    creator_ip = session.get("creator_ip")
+    client_ip = _client_ip(request)
+    if creator_ip and client_ip and creator_ip != client_ip:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the session creator may delete this session",
+        )
+
     if not session_manager.delete_session(session_id):
         raise HTTPException(status_code=404, detail="Session not found")
 

@@ -7,7 +7,10 @@ import type {
   ExamplesResponse,
 } from "@/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// All API calls go through Next.js rewrites at /api/* (same-origin), which
+// proxy to the internal backend service. The backend container is not on the
+// public proxy network — only the frontend can reach it.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 class ApiClient {
   private sessionId: string | null = null;

@@ -14,9 +14,12 @@ class Settings(BaseSettings):
     # CORS - Frontend URL (set in production)
     frontend_url: str = "http://localhost:3000"
 
-    # Optional default API keys (for demo purposes)
+    # Optional default API keys (for "free showcase" mode — user doesn't bring
+    # their own key). When set, the backend uses these as fallback on providers
+    # where they apply. Per-IP rate limit applies stricter than BYOK.
     default_openai_api_key: str | None = None
     default_groq_api_key: str | None = None
+    default_openrouter_api_key: str | None = None
 
     # Cache
     cache_db_path: str = "scrape_cache.db"

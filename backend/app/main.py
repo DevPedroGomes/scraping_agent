@@ -41,16 +41,17 @@ AI Web Scraper API v3.0 - Multi-Provider LLM Extraction
         """,
         version="3.0.0",
         lifespan=lifespan,
-        docs_url="/docs",
-        redoc_url="/redoc"
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
     )
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Session-Id"],
     )
 
     app.include_router(router, prefix="/api/v1", tags=["scraper"])
@@ -59,7 +60,6 @@ AI Web Scraper API v3.0 - Multi-Provider LLM Extraction
     async def root():
         return {
             "message": "AI Web Scraper Showcase API",
-            "docs": "/docs",
             "health": "/api/v1/health"
         }
 

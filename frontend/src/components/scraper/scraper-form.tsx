@@ -210,16 +210,47 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             )}
           </div>
 
-          {/* API Key - hidden for Groq, shown for others */}
+          {/* API Key — Groq has shared free fallback; other providers need BYOK */}
           {isGroq ? (
-            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
-              <p className="text-sm text-emerald-700">
-                Free Model — No API key required!
-              </p>
+            <div className="space-y-2">
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-sm font-medium text-emerald-800">
+                  ✓ Free showcase mode — using a shared Groq key
+                </p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  No key needed; rate-limited per IP. Paste your own free Groq
+                  key below for unlimited use ({" "}
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="underline"
+                  >
+                    get one in 30s
+                  </a>
+                  ).
+                </p>
+              </div>
+              <Label htmlFor="api-key" className="text-xs text-muted-foreground">
+                Optional — your own Groq API key
+              </Label>
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="gsk_... (leave blank to use shared free mode)"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="font-mono text-sm"
+              />
             </div>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="api-key">{PROVIDER_API_KEY_LABELS[currentProvider]}</Label>
+              <Label htmlFor="api-key">
+                {PROVIDER_API_KEY_LABELS[currentProvider]}
+                <span className="ml-1 rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
+                  BYOK required
+                </span>
+              </Label>
               <Input
                 id="api-key"
                 type="password"
@@ -227,9 +258,10 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="font-mono text-sm"
+                required
               />
               <p className="text-xs text-muted-foreground">
-                Your key is not stored and is only used for this request
+                Paid models need your own key. Not stored — used only for this request. Pick a Groq model above for the free shared mode.
               </p>
             </div>
           )}
