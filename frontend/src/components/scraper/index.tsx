@@ -49,22 +49,24 @@ export function Scraper() {
     <div className="space-y-6">
       {/* Example buttons */}
       {examples.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Try an example:</span>
-          {examples.map((example) => (
-            <button
-              key={example.id}
-              type="button"
-              onClick={() => handleExampleClick(example)}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border/50 bg-muted/30 hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {example.name}
-              <Badge variant="secondary" className="text-[10px] px-1">
-                FREE
-              </Badge>
-            </button>
-          ))}
+        <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+          <span className="block text-sm text-muted-foreground sm:inline">Try an example:</span>
+          <div className="grid grid-cols-2 gap-2 sm:contents">
+            {examples.map((example) => (
+              <button
+                key={example.id}
+                type="button"
+                onClick={() => handleExampleClick(example)}
+                disabled={isLoading}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-md border border-border/50 bg-muted/30 hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:py-1.5"
+              >
+                {example.name}
+                <Badge variant="secondary" className="text-[10px] px-1">
+                  FREE
+                </Badge>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
