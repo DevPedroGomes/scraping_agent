@@ -1,7 +1,7 @@
 "use client";
 
 import { Scraper } from "@/components/scraper";
-import { Globe, Code2, Cpu, FileJson, Shield } from "lucide-react";
+import { Globe, Code2, Cpu, FileJson, Shield, ShieldCheck, Lock, Database, Zap, KeyRound, ArrowRight } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 import { getTranslations } from "@/lib/i18n";
 
@@ -63,27 +63,87 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 sm:px-8 py-16">
-        {/* Hero */}
-        <header className="text-center mb-14">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-medium font-mono mb-6">
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 70% 50% at 50% 0%, rgba(16,185,129,0.10), transparent 60%), radial-gradient(ellipse 50% 35% at 85% 30%, rgba(59,130,246,0.07), transparent 70%)",
+          }}
+        />
+        <div className="max-w-5xl mx-auto px-6 sm:px-8 pt-16 pb-12 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-emerald-200 text-xs font-medium font-mono mb-6 shadow-sm">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            {t('badge')}
+            <span className="text-emerald-700">Production-ready · BYOK 6 providers</span>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-semibold tracking-tighter leading-[0.9] text-neutral-900 mb-6">
-            {t('hero.title1')}
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tighter leading-[0.9] text-neutral-900 mb-6">
+            URL + a sentence
             <br />
-            <span className="text-emerald-600">{t('hero.title2')}</span>
+            <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">becomes JSON.</span>
           </h1>
 
-          <p className="text-lg text-neutral-500 leading-relaxed max-w-2xl mx-auto">
+          <p className="text-lg text-neutral-500 leading-relaxed max-w-2xl mx-auto mb-3">
             {t('hero.subtitle')}
           </p>
-        </header>
+          <p className="text-sm text-neutral-400 font-mono max-w-xl mx-auto">
+            With actual SSRF defense, DNS-rebinding guards and prompt-injection isolation.
+          </p>
+
+          {/* Quick visual: URL → JSON */}
+          <div className="mt-10 max-w-3xl mx-auto grid sm:grid-cols-3 items-center gap-3">
+            <div className="bg-white border border-neutral-200 rounded-xl p-3 text-left text-xs font-mono">
+              <p className="text-[10px] text-neutral-400 uppercase mb-1">Input</p>
+              <p className="text-neutral-700 truncate">https://news.ycombinator.com</p>
+              <p className="text-neutral-500 mt-1">&quot;top 5 story titles&quot;</p>
+            </div>
+            <div className="hidden sm:flex justify-center">
+              <ArrowRight className="h-5 w-5 text-neutral-300" />
+            </div>
+            <div className="bg-neutral-900 text-emerald-400 rounded-xl p-3 text-left text-xs font-mono shadow-lg">
+              <p className="text-[10px] text-neutral-500 uppercase mb-1">Output</p>
+              <pre className="text-[10px] leading-relaxed overflow-hidden">{`[
+  { "title": "Show HN: ..." },
+  { "title": "Ask HN: ..." },
+  ...
+]`}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Security pillars */}
+      <section className="max-w-6xl mx-auto px-6 sm:px-8 py-12">
+        <div className="text-center mb-10">
+          <span className="text-xs uppercase tracking-widest text-neutral-400 font-mono">Engineered for production</span>
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-neutral-900 mt-2">
+            What separates this from a 30-line script
+          </h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: ShieldCheck, label: "SSRF v2", desc: "IDNA + IPv6 unwrap + IP allowlist computed before the request, re-checked on every subresource." },
+            { icon: Shield,      label: "DNS-rebinding guard", desc: "Playwright route hooks intercept each subresource and abort if it leaves the allow-set." },
+            { icon: Lock,        label: "Prompt injection cage", desc: "Untrusted scraped content is wrapped in a system-prompt isolation layer before reaching the LLM." },
+            { icon: KeyRound,    label: "Per-key cache scoping", desc: "Cache key includes sha256 of API key — no cross-user leakage between BYOK sessions." },
+          ].map((p) => (
+            <div key={p.label} className="bg-white border border-neutral-200 rounded-2xl p-5 hover-lift">
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                <p.icon className="h-5 w-5" />
+              </div>
+              <h3 className="font-semibold text-neutral-900 text-sm mb-1.5">{p.label}</h3>
+              <p className="text-xs text-neutral-500 leading-relaxed">{p.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="max-w-6xl mx-auto px-6 sm:px-8 py-4">
 
         {/* Pipeline */}
         <section className="mb-16">
@@ -129,17 +189,24 @@ export default function Home() {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-neutral-200 mt-16 pt-8 pb-8 text-center">
-          <div className="space-y-2">
-            <p className="text-sm text-neutral-500">
-              {t('footer.built')}{" "}
-              <span className="font-medium text-neutral-900">Next.js</span>,{" "}
-              <span className="font-medium text-neutral-900">FastAPI</span> and{" "}
-              <span className="font-medium text-neutral-900">Playwright</span>
-            </p>
-            <p className="text-xs text-neutral-400 font-mono">
-              {t('footer.tech')}
-            </p>
+        <footer className="border-t border-neutral-200 mt-16 pt-8 pb-8">
+          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
+            <div className="space-y-1">
+              <p className="text-sm text-neutral-500">
+                {t('footer.built')}{" "}
+                <span className="font-medium text-neutral-900">Next.js</span>,{" "}
+                <span className="font-medium text-neutral-900">FastAPI</span> and{" "}
+                <span className="font-medium text-neutral-900">Playwright</span>
+              </p>
+              <p className="text-xs text-neutral-400 font-mono">
+                {t('footer.tech')}
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-neutral-500">
+              <a href="https://github.com/devpedrogomes" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">GitHub</a>
+              <a href="https://www.linkedin.com/in/devpgomes" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">LinkedIn</a>
+              <a href="https://pgdev.com.br" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">Portfolio</a>
+            </div>
           </div>
         </footer>
       </div>
