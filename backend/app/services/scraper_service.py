@@ -18,6 +18,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+import os
 import re
 import socket
 import time
@@ -312,6 +313,9 @@ class BrowserPool:
         self._playwright = None
         self._browser = None
         self._lock = asyncio.Lock()
+        self._last_used = 0.0
+        self._idle_timeout = float(os.getenv("BROWSER_IDLE_TIMEOUT_SECONDS", "300"))
+        self._reaper_task: asyncio.Task | None = None
 
     def _build_launch_args(self, stealth_mode: bool) -> dict:
         """Build browser launch arguments."""
@@ -359,6 +363,7 @@ class BrowserPool:
 
     async def _ensure_browser(self, stealth_mode: bool):
         """Launch browser if not already running. Thread-safe via asyncio.Lock."""
+        self._last_used = time.monotonic()
         if self._browser and self._browser.is_connected():
             return
 
@@ -372,6 +377,40 @@ class BrowserPool:
 
             launch_args = self._build_launch_args(stealth_mode)
             self._browser = await self._playwright.chromium.launch(**launch_args)
+            logger.info("Chromium launched (idle timeout: %ds)", int(self._idle_timeout))
+
+            if self._reaper_task is None or self._reaper_task.done():
+                self._reaper_task = asyncio.create_task(self._idle_reaper())
+
+    async def _idle_reaper(self):
+        """Close the browser if idle for longer than _idle_timeout.
+
+        Runs as a background task; checks every 60s. Releases ~150-250MB of
+        RAM when the showcase is dormant. Next request pays ~1-2s cold start.
+        """
+        check_interval = min(60.0, max(10.0, self._idle_timeout / 5))
+        while True:
+            try:
+                await asyncio.sleep(check_interval)
+                if not self._browser:
+                    continue
+                idle = time.monotonic() - self._last_used
+                if idle < self._idle_timeout:
+                    continue
+                async with self._lock:
+                    idle = time.monotonic() - self._last_used
+                    if self._browser and idle >= self._idle_timeout:
+                        logger.info("Closing idle Chromium after %.0fs", idle)
+                        try:
+                            await self._browser.close()
+                        except Exception as exc:
+                            logger.warning("Error closing idle browser: %s", exc)
+                        self._browser = None
+                        return
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("Idle reaper error: %s", exc)
 
     async def _create_page(self, stealth_mode: bool, allowed_ips: set[str] | None = None):
         """Create a fresh context + page with stealth settings.
@@ -471,6 +510,13 @@ class BrowserPool:
 
     async def close(self):
         """Shut down the browser and playwright. Called on app shutdown."""
+        if self._reaper_task and not self._reaper_task.done():
+            self._reaper_task.cancel()
+            try:
+                await self._reaper_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._reaper_task = None
         if self._browser:
             await self._browser.close()
             self._browser = None

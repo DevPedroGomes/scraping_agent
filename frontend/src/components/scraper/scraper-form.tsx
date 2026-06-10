@@ -349,14 +349,20 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Smart Routing (auto-select model)</Label>
                 <Select
-                  value={costTier}
-                  onValueChange={(v) => setCostTier(v as CostTier | "")}
+                  // Radix Select rejects empty string as a value (used internally
+                  // to represent "no selection"). Map our "" sentinel to the
+                  // explicit "use-selected" token at the UI layer; convert back
+                  // when persisting / submitting.
+                  value={costTier === "" ? "use-selected" : costTier}
+                  onValueChange={(v) =>
+                    setCostTier(v === "use-selected" ? "" : (v as CostTier))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Use selected model above" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Use selected model</SelectItem>
+                    <SelectItem value="use-selected">Use selected model</SelectItem>
                     <SelectItem value="free">Free (Groq open source)</SelectItem>
                     <SelectItem value="budget">Budget (cheapest)</SelectItem>
                     <SelectItem value="standard">Standard (balanced)</SelectItem>
