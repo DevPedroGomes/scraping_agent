@@ -6,3 +6,6 @@
 # Local docs / scratchpads — only README.md is published
 *.md
 !README.md
+
+# deploy control (VPS-local)
+.deploy-freeze

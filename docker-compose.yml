@@ -1,5 +1,6 @@
 services:
   backend:
+    image: ghcr.io/devpedrogomes/scraping_agent/backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -31,6 +32,7 @@ services:
       start_period: 30s
 
   frontend:
+    image: ghcr.io/devpedrogomes/scraping_agent/frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
