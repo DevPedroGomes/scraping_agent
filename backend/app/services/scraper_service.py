@@ -818,8 +818,8 @@ class ScraperService:
         api_key_source = "user"
 
         if not api_key:
-            if provider == ModelProvider.GROQ and settings.default_groq_api_key:
-                api_key = settings.default_groq_api_key
+            if provider == ModelProvider.GROQ and self.settings.default_groq_api_key:
+                api_key = self.settings.default_groq_api_key
                 api_key_source = "shared"
             else:
                 return ScrapeResponse(
