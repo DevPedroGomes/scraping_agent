@@ -6,6 +6,9 @@ services:
       dockerfile: Dockerfile
     container_name: scraper-api
     restart: unless-stopped
+    # tini como PID 1: reapeia os processos filhos do Chrome headless que o
+    # uvicorn (PID 1 antes disso) deixava como zumbis no host.
+    init: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
