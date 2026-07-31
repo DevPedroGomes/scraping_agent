@@ -15,6 +15,8 @@ from app.models.schemas import (
     MODEL_PRICING,
 )
 from app.core.session_manager import session_manager
+from app.core import daily_budget
+from app.core.config import get_settings
 from app.core.examples import get_examples_list, get_example_by_match
 from app.services.scraper_service import scraper_service
 
@@ -230,16 +232,39 @@ async def scrape_website(
             detail="Scrape limit reached for this session. Examples are still available."
         )
 
+    # Teto diario, so para quem usa a nossa chave compartilhada. Consumido
+    # ANTES da chamada: contar depois deixa um burst de requests concorrentes
+    # passar todo junto, porque nenhum deles ainda foi contado.
+    uses_shared_key = not request.api_key
+    if uses_shared_key:
+        allowed, _remaining = await daily_budget.consume(
+            "scrape", get_settings().daily_shared_key_scrapes
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=503,
+                detail="Daily limit for the free shared key reached. Paste your own API key to keep going, or come back tomorrow.",
+                headers={"Retry-After": str(daily_budget.seconds_until_utc_midnight())},
+            )
+
     lock = session_manager.get_lock(session_id)
     async with lock:
         session_manager.record_request(session_id)
         session_manager.update_session_activity(session_id)
 
-        result = await scraper_service.scrape(request)
+        try:
+            result = await scraper_service.scrape(request)
+        except BaseException:
+            # Nao chegamos a gastar com o provider: devolve a cota.
+            if uses_shared_key:
+                await daily_budget.refund("scrape")
+            raise
 
         # Record scrape on success
         if result.success:
             session_manager.record_scrape(session_id)
+        elif uses_shared_key:
+            await daily_budget.refund("scrape")
 
         # Add remaining scrapes info
         scrape_count, max_scrapes = session_manager.get_scrape_info(session_id)

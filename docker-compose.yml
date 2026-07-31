@@ -21,6 +21,13 @@ services:
           memory: 512m
     env_file:
       - .env
+    environment:
+      # Teto diario da chave compartilhada vive no mesmo volume persistente do
+      # cache: em memoria ele zeraria a cada deploy, que e justamente quando o
+      # trafego costuma ser reproduzido.
+      DAILY_BUDGET_PATH: /app/data/daily_budget.json
+      # Corta toda chamada paga na hora, sem redeploy.
+      DEMO_KILL_SWITCH: ${DEMO_KILL_SWITCH:-0}
     volumes:
       - ./backend/data:/app/data
     # Backend is isolated on an internal-only network. Only the frontend can

@@ -6,8 +6,11 @@ class Settings(BaseSettings):
     app_name: str = "AI Web Scraper Showcase"
     debug: bool = False
 
-    # Rate limiting
-    max_concurrent_sessions: int = 35
+    # Rate limiting.
+    # 35 sessoes concorrentes vezes um Chromium cada nao cabe em 2 vCPU: a
+    # maquina inteira cai junto, levando as outras demos. O teto aqui protege
+    # a VPS, nao o custo.
+    max_concurrent_sessions: int = 5
     max_requests_per_minute: int = 10
     session_timeout_minutes: int = 30
 
@@ -26,6 +29,12 @@ class Settings(BaseSettings):
 
     # Cost control
     max_scrapes_per_session: int = 5
+
+    # Teto diario global de chamadas pagas com a NOSSA chave compartilhada.
+    # Os limites por sessao e por IP protegem contra um visitante; nenhum dos
+    # dois protege contra todos eles juntos, nem contra alguem trocando de IP.
+    # Quem traz a propria chave (BYOK) nao consome deste teto: nao custa nada.
+    daily_shared_key_scrapes: int = 200
 
     @property
     def cors_origins(self) -> list[str]:
