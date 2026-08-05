@@ -9,3 +9,6 @@
 
 # deploy control (VPS-local)
 .deploy-freeze
+
+# estado de runtime do teto diario — nunca versionar
+backend/data/
