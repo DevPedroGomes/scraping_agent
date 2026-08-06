@@ -1,5 +1,7 @@
 # AI Web Scraper
 
+[![CI](https://github.com/DevPedroGomes/scraping_agent/actions/workflows/deploy.yml/badge.svg)](https://github.com/DevPedroGomes/scraping_agent/actions/workflows/deploy.yml)
+
 A full-stack showcase that turns any URL plus a natural-language prompt into validated JSON. The frontend collects input, the backend renders the page in a hardened headless Chromium, converts the DOM to Markdown, and dispatches the cleaned content to the user's chosen LLM provider. The whole thing is engineered around a multi-layer SSRF / DNS-rebinding defense, prompt-injection isolation, per-key cache scoping, and IP-bound sessions.
 
 ## Overview
