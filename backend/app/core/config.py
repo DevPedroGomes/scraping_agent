@@ -6,11 +6,13 @@ class Settings(BaseSettings):
     app_name: str = "AI Web Scraper Showcase"
     debug: bool = False
 
-    # Rate limiting.
-    # 35 sessoes concorrentes vezes um Chromium cada nao cabe em 2 vCPU: a
-    # maquina inteira cai junto, levando as outras demos. O teto aqui protege
-    # a VPS, nao o custo.
-    max_concurrent_sessions: int = 5
+    # Registro de sessoes em memoria. NAO e o teto de carga da VPS: o frontend
+    # abre uma sessao a cada carregamento de pagina, entao um numero baixo aqui
+    # recusa visitante que nem chegou a pedir um scrape. Quem protege a maquina
+    # e MAX_CONCURRENT_PAGES (semaforo no BrowserManager), porque a demo usa um
+    # unico Chromium com um contexto por request, nao um navegador por sessao.
+    max_concurrent_sessions: int = 200
+    max_concurrent_pages: int = 3
     max_requests_per_minute: int = 10
     session_timeout_minutes: int = 30
 

@@ -14,6 +14,7 @@ export function Scraper() {
     result,
     error,
     session,
+    sessionError,
     health,
     models,
     examples,
@@ -47,6 +48,14 @@ export function Scraper() {
 
   return (
     <div className="space-y-6">
+      {/* Falha ao abrir sessao dita no topo, antes de o visitante gastar tempo
+          preenchendo um formulario que ja sabemos que vai falhar. */}
+      {sessionError && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {sessionError}
+        </div>
+      )}
+
       {/* Example buttons */}
       {examples.length > 0 && (
         <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2">

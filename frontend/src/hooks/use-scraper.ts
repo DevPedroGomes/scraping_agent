@@ -68,6 +68,10 @@ export function useScraper() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [models, setModels] = useState<Model[]>(FALLBACK_MODELS);
   const [examples, setExamples] = useState<ExampleScrape[]>([]);
+  // Sem isto a falha ao abrir sessao so ia para o console: a tela ficava com
+  // aparencia normal e o visitante so descobria ao clicar em Extract, recebendo
+  // "Missing X-Session-Id header" — mensagem de API, nao de produto.
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const refreshSession = useCallback(async () => {
     const sessionId = apiClient.getSessionId();
@@ -97,7 +101,14 @@ export function useScraper() {
 
       const newSession = await apiClient.createSession();
       setSession(newSession);
+      setSessionError(null);
     } catch (err) {
+      const detail = err instanceof Error ? err.message : "";
+      setSessionError(
+        detail.includes("this IP")
+          ? "Too many demo sessions opened from your network in the last few minutes. Wait about ten minutes and reload."
+          : "Could not open a demo session right now. Reload the page in a moment."
+      );
       console.error("Failed to initialize session:", err);
     }
   }, []);
@@ -173,6 +184,7 @@ export function useScraper() {
     result,
     error,
     session,
+    sessionError,
     health,
     models,
     examples,

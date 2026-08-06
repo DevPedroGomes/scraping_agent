@@ -56,7 +56,11 @@ class TestSessionEndpoints:
         create_resp = client.post("/api/v1/session")
         session_id = create_resp.json()["session_id"]
 
-        response = client.delete(f"/api/v1/session/{session_id}")
+        # Apagar exige provar posse: o header tem de casar com o id do caminho.
+        response = client.delete(
+            f"/api/v1/session/{session_id}",
+            headers={"X-Session-Id": session_id},
+        )
         assert response.status_code == 200
 
         # Confirm deleted
@@ -64,8 +68,28 @@ class TestSessionEndpoints:
         assert get_resp.status_code == 404
 
     def test_delete_nonexistent_session(self, client: TestClient):
-        response = client.delete("/api/v1/session/nonexistent-id")
+        response = client.delete(
+            "/api/v1/session/nonexistent-id",
+            headers={"X-Session-Id": "nonexistent-id"},
+        )
         assert response.status_code == 404
+
+    def test_delete_requires_matching_header(self, client: TestClient):
+        """Sem prova de posse ninguem apaga a sessao de outro visitante."""
+        create_resp = client.post("/api/v1/session")
+        session_id = create_resp.json()["session_id"]
+
+        # Sem header nenhum
+        assert client.delete(f"/api/v1/session/{session_id}").status_code == 403
+
+        # Com header de outra sessao
+        assert client.delete(
+            f"/api/v1/session/{session_id}",
+            headers={"X-Session-Id": "some-other-session"},
+        ).status_code == 403
+
+        # A sessao continua viva
+        assert client.get(f"/api/v1/session/{session_id}").status_code == 200
 
 
 class TestModelsEndpoint:
@@ -112,4 +136,4 @@ class TestRootEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert "message" in data
-        assert "docs" in data
+        assert "health" in data

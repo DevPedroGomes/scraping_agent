@@ -316,6 +316,15 @@ class BrowserPool:
         self._last_used = 0.0
         self._idle_timeout = float(os.getenv("BROWSER_IDLE_TIMEOUT_SECONDS", "300"))
         self._reaper_task: asyncio.Task | None = None
+        # O que precisa de teto nesta VPS de 2 vCPU e a quantidade de PAGINAS
+        # abertas ao mesmo tempo, nao a quantidade de sessoes. Sessao e uma
+        # entrada em dicionario; pagina e um render de Chromium. Confundir os
+        # dois deixava a demo aceitando so 5 visitantes simultaneos: o sexto
+        # levava 503 sem nunca ter aberto um navegador.
+        # Excedentes esperam a vez aqui em vez de serem recusados na porta.
+        self._page_slots = asyncio.Semaphore(
+            max(1, int(os.getenv("MAX_CONCURRENT_PAGES", "3")))
+        )
 
     def _build_launch_args(self, stealth_mode: bool) -> dict:
         """Build browser launch arguments."""
@@ -445,17 +454,18 @@ class BrowserPool:
         allowed_ips: set[str] | None = None,
     ) -> str:
         """Fetch a page using the pooled browser."""
-        context, page = await self._create_page(stealth_mode, allowed_ips)
-        try:
-            referer = generate_convincing_referer(url) if stealth_mode else None
-            goto_opts = {"wait_until": "networkidle", "timeout": 30000}
-            if referer:
-                goto_opts["referer"] = referer
+        async with self._page_slots:
+            context, page = await self._create_page(stealth_mode, allowed_ips)
+            try:
+                referer = generate_convincing_referer(url) if stealth_mode else None
+                goto_opts = {"wait_until": "networkidle", "timeout": 30000}
+                if referer:
+                    goto_opts["referer"] = referer
 
-            await page.goto(url, **goto_opts)
-            return await page.content()
-        finally:
-            await context.close()
+                await page.goto(url, **goto_opts)
+                return await page.content()
+            finally:
+                await context.close()
 
     async def execute_actions(
         self,
@@ -466,47 +476,48 @@ class BrowserPool:
     ) -> tuple[str, int]:
         """Execute page actions and return HTML content."""
         actions_executed = 0
-        context, page = await self._create_page(stealth_mode, allowed_ips)
-        try:
-            referer = generate_convincing_referer(url) if stealth_mode else None
-            goto_opts = {"wait_until": "networkidle", "timeout": 30000}
-            if referer:
-                goto_opts["referer"] = referer
+        async with self._page_slots:
+            context, page = await self._create_page(stealth_mode, allowed_ips)
+            try:
+                referer = generate_convincing_referer(url) if stealth_mode else None
+                goto_opts = {"wait_until": "networkidle", "timeout": 30000}
+                if referer:
+                    goto_opts["referer"] = referer
 
-            await page.goto(url, **goto_opts)
+                await page.goto(url, **goto_opts)
 
-            for action in actions:
-                try:
-                    if action.action == ActionType.CLICK:
-                        if action.selector:
-                            await page.click(action.selector, timeout=5000)
+                for action in actions:
+                    try:
+                        if action.action == ActionType.CLICK:
+                            if action.selector:
+                                await page.click(action.selector, timeout=5000)
+                                await page.wait_for_timeout(action.wait_ms)
+                                actions_executed += 1
+
+                        elif action.action == ActionType.SCROLL:
+                            direction = action.value or "down"
+                            distance = 500 if direction == "down" else -500
+                            await page.evaluate(f"window.scrollBy(0, {distance})")
                             await page.wait_for_timeout(action.wait_ms)
                             actions_executed += 1
 
-                    elif action.action == ActionType.SCROLL:
-                        direction = action.value or "down"
-                        distance = 500 if direction == "down" else -500
-                        await page.evaluate(f"window.scrollBy(0, {distance})")
-                        await page.wait_for_timeout(action.wait_ms)
-                        actions_executed += 1
-
-                    elif action.action == ActionType.WAIT:
-                        await page.wait_for_timeout(action.wait_ms)
-                        actions_executed += 1
-
-                    elif action.action == ActionType.TYPE:
-                        if action.selector and action.value:
-                            await page.fill(action.selector, action.value, timeout=5000)
+                        elif action.action == ActionType.WAIT:
                             await page.wait_for_timeout(action.wait_ms)
                             actions_executed += 1
 
-                except Exception as e:
-                    print(f"Action {action.action} failed: {e}")
-                    continue
+                        elif action.action == ActionType.TYPE:
+                            if action.selector and action.value:
+                                await page.fill(action.selector, action.value, timeout=5000)
+                                await page.wait_for_timeout(action.wait_ms)
+                                actions_executed += 1
 
-            return await page.content(), actions_executed
-        finally:
-            await context.close()
+                    except Exception as e:
+                        print(f"Action {action.action} failed: {e}")
+                        continue
+
+                return await page.content(), actions_executed
+            finally:
+                await context.close()
 
     async def close(self):
         """Shut down the browser and playwright. Called on app shutdown."""
