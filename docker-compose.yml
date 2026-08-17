@@ -18,7 +18,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          # 512m era apertado para o Chromium com MAX_CONCURRENT_PAGES=3: tres
+          # visitantes em paginas pesadas ao mesmo tempo levavam o container a
+          # ser morto por OOM no meio da demo. 768m da a folga do terceiro
+          # contexto sem soltar o teto de vez.
+          memory: 768m
     env_file:
       - .env
     environment:
