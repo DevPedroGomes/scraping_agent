@@ -84,6 +84,8 @@ export interface ScrapeResponse {
   estimated_cost?: number;
   // Cache info
   cache_hit: boolean;
+  // Amostra pre-gravada dos exemplos do showcase, nao um scrape ao vivo.
+  is_sample?: boolean;
   // Markdown info
   markdown_used: boolean;
   token_reduction?: number;

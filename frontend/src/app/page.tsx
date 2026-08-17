@@ -130,7 +130,7 @@ export default function Home() {
             { icon: ShieldCheck, label: "SSRF v2", desc: "IDNA + IPv6 unwrap + IP allowlist computed before the request, re-checked on every subresource." },
             { icon: Shield,      label: "DNS-rebinding guard", desc: "Playwright route hooks intercept each subresource and abort if it leaves the allow-set." },
             { icon: Lock,        label: "Prompt injection cage", desc: "Untrusted scraped content is wrapped in a system-prompt isolation layer before reaching the LLM." },
-            { icon: KeyRound,    label: "Per-key cache scoping", desc: "Cache key includes sha256 of API key — no cross-user leakage between BYOK sessions." },
+            { icon: KeyRound,    label: "Per-key cache scoping", desc: "Cache key includes sha256 of API key, no cross-user leakage between BYOK sessions." },
           ].map((p) => (
             <div key={p.label} className="bg-white border border-neutral-200 rounded-2xl p-5 hover-lift">
               <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">

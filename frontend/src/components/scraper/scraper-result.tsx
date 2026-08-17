@@ -78,9 +78,11 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
               </Badge>
             </CardTitle>
             <CardDescription>
-              Executed in {result.execution_time.toFixed(2)}s
-              {result.model_used && ` using ${result.model_used}`}
-              {providerName && ` (${providerName})`}
+              {result.is_sample
+                ? "Pre-recorded sample, not a live scrape"
+                : `Executed in ${result.execution_time.toFixed(2)}s`}
+              {!result.is_sample && result.model_used && ` using ${result.model_used}`}
+              {!result.is_sample && providerName && ` (${providerName})`}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={onClear}>
@@ -90,11 +92,15 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
 
         {/* Metadata badges */}
         <div className="flex flex-wrap gap-2 mt-3">
-          {result.cache_hit && (
+          {result.is_sample ? (
+            <Badge variant="outline" className="text-xs">
+              Sample
+            </Badge>
+          ) : result.cache_hit ? (
             <Badge variant="secondary" className="text-xs">
               Cache Hit
             </Badge>
-          )}
+          ) : null}
           {result.markdown_used && (
             <Badge variant="secondary" className="text-xs">
               Markdown

@@ -28,7 +28,11 @@ export function Scraper() {
     const response = await scrape(request);
 
     if (response?.success) {
-      const cacheMsg = response.cache_hit ? " (from cache)" : "";
+      const cacheMsg = response.is_sample
+        ? " (pre-recorded sample)"
+        : response.cache_hit
+          ? " (from cache)"
+          : "";
       toast.success(`Data extracted successfully${cacheMsg}!`);
     } else if (response?.error || error) {
       toast.error(response?.error || error || "Error extracting data");
@@ -59,7 +63,9 @@ export function Scraper() {
       {/* Example buttons */}
       {examples.length > 0 && (
         <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-          <span className="block text-sm text-muted-foreground sm:inline">Try an example:</span>
+          <span className="block text-sm text-muted-foreground sm:inline">
+            Pre-recorded samples (free, no live scrape):
+          </span>
           <div className="grid grid-cols-2 gap-2 sm:contents">
             {examples.map((example) => (
               <button
@@ -71,7 +77,7 @@ export function Scraper() {
               >
                 {example.name}
                 <Badge variant="secondary" className="text-[10px] px-1">
-                  FREE
+                  SAMPLE
                 </Badge>
               </button>
             ))}

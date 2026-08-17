@@ -291,6 +291,13 @@ class ScrapeResponse(BaseModel):
         default=False,
         description="Whether page content was served from cache"
     )
+    is_sample: bool = Field(
+        default=False,
+        description=(
+            "True when this is a pre-recorded sample from the showcase "
+            "examples, not a live scrape. The UI labels it as such."
+        ),
+    )
 
     # Markdown conversion
     markdown_used: bool = Field(

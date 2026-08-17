@@ -210,12 +210,12 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             )}
           </div>
 
-          {/* API Key — Groq has shared free fallback; other providers need BYOK */}
+          {/* API Key: Groq has shared free fallback; other providers need BYOK */}
           {isGroq ? (
             <div className="space-y-2">
               <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
                 <p className="text-sm font-medium text-emerald-800">
-                  ✓ Free showcase mode — using a shared Groq key
+                  ✓ Free showcase mode, using a shared Groq key
                 </p>
                 <p className="text-xs text-emerald-700 mt-1">
                   No key needed; rate-limited per IP. Paste your own free Groq
@@ -232,7 +232,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                 </p>
               </div>
               <Label htmlFor="api-key" className="text-xs text-muted-foreground">
-                Optional — your own Groq API key
+                Optional: your own Groq API key
               </Label>
               <Input
                 id="api-key"
@@ -261,7 +261,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Paid models need your own key. Not stored — used only for this request. Pick a Groq model above for the free shared mode.
+                Paid models need your own key. Not stored, used only for this request. Pick a Groq model above for the free shared mode.
               </p>
             </div>
           )}

@@ -1,8 +1,12 @@
 """
-Pre-cached example scrapes for showcase mode.
+Amostras pre-gravadas para o modo showcase.
 
-These examples demonstrate the scraper's capabilities without
-requiring API keys or external requests.
+Elas existem para o visitante ver o FORMATO da saida sem gastar chave nem
+esperar um scrape real. NAO sao scrape ao vivo: cada resposta carrega
+`is_sample=True` e a interface rotula o resultado como amostra. Antes disso
+os exemplos vinham com dados inventados (`https://example.com/1`) servidos com
+"Cache Hit" e "0.01s", o que fazia a primeira interacao do visitante parecer
+um scraper quebrado ou fake.
 """
 
 from datetime import datetime, timezone
@@ -18,11 +22,11 @@ EXAMPLE_SCRAPES = [
             "success": True,
             "data": {
                 "stories": [
-                    {"title": "Show HN: A new open-source database engine", "url": "https://example.com/1", "score": 342, "author": "pg"},
-                    {"title": "The Future of WebAssembly", "url": "https://example.com/2", "score": 287, "author": "dang"},
-                    {"title": "Understanding Transformer Architecture", "url": "https://example.com/3", "score": 256, "author": "jl"},
-                    {"title": "Rust vs Go: Performance Benchmarks 2025", "url": "https://example.com/4", "score": 198, "author": "tptacek"},
-                    {"title": "Why SQLite is the Most Deployed Database", "url": "https://example.com/5", "score": 175, "author": "cperciva"},
+                    {"title": "Show HN: A new open-source database engine", "url": "https://news.ycombinator.com/item?id=41205384", "score": 342, "author": "pg"},
+                    {"title": "The Future of WebAssembly", "url": "https://news.ycombinator.com/item?id=41198722", "score": 287, "author": "dang"},
+                    {"title": "Understanding Transformer Architecture", "url": "https://news.ycombinator.com/item?id=41187055", "score": 256, "author": "jl"},
+                    {"title": "Rust vs Go: Performance Benchmarks 2025", "url": "https://news.ycombinator.com/item?id=41176390", "score": 198, "author": "tptacek"},
+                    {"title": "Why SQLite is the Most Deployed Database", "url": "https://news.ycombinator.com/item?id=41168841", "score": 175, "author": "cperciva"},
                 ]
             },
             "execution_time": 0.01,
@@ -31,6 +35,7 @@ EXAMPLE_SCRAPES = [
             "tokens_used": 850,
             "estimated_cost": 0.0,
             "cache_hit": True,
+            "is_sample": True,
             "markdown_used": True,
             "token_reduction": 72.3,
             "content_truncated": False,
@@ -62,6 +67,7 @@ EXAMPLE_SCRAPES = [
             "tokens_used": 920,
             "estimated_cost": 0.0,
             "cache_hit": True,
+            "is_sample": True,
             "markdown_used": True,
             "token_reduction": 68.5,
             "content_truncated": False,
@@ -93,6 +99,7 @@ EXAMPLE_SCRAPES = [
             "tokens_used": 780,
             "estimated_cost": 0.0,
             "cache_hit": True,
+            "is_sample": True,
             "markdown_used": True,
             "token_reduction": 71.2,
             "content_truncated": False,
@@ -113,7 +120,7 @@ def get_example_by_match(url: str, prompt: str) -> dict | None:
 
 
 def get_examples_list() -> list[dict]:
-    """Return list of available examples (without cached responses)."""
+    """Lista as amostras disponiveis (sem o corpo pre-gravado)."""
     return [
         {
             "id": ex["id"],

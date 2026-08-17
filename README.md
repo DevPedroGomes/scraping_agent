@@ -153,7 +153,7 @@ Other hardening in the browser context: `ignore_https_errors=False` (was True in
 | Per-IP create limiter | Sliding window: max **5 sessions per IP per 10 minutes** |
 | Session deletion | `DELETE /api/v1/session/{id}` requires `X-Session-Id == path id` **and** the request to come from the original `creator_ip`. 403 otherwise |
 | TTL | 30 minutes idle (`session_timeout_minutes`) |
-| Concurrency cap | 35 active sessions globally (`max_concurrent_sessions`); oldest evicted on overflow |
+| Concurrency cap | 200 active sessions globally (`max_concurrent_sessions`); oldest evicted on overflow |
 | Per-session request limit | 10/min (`max_requests_per_minute`) |
 | Per-session scrape limit | 5 successful scrapes (`max_scrapes_per_session`); pre-cached examples don't count |
 
@@ -249,7 +249,7 @@ Backend (`backend/.env`):
 
 ```ini
 DEBUG=false
-MAX_CONCURRENT_SESSIONS=35
+MAX_CONCURRENT_SESSIONS=200
 MAX_REQUESTS_PER_MINUTE=10
 SESSION_TIMEOUT_MINUTES=30
 MAX_SCRAPES_PER_SESSION=5
