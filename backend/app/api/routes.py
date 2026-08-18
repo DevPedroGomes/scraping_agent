@@ -285,7 +285,7 @@ async def get_available_models():
 
     model_info = {
         # Groq (FREE - Open Source Models)
-        ModelType.LLAMA_3_3_70B: ("Llama 3.3 70B", "FREE - Best open source model, rivals GPT-4"),
+        ModelType.GPT_OSS_120B: ("GPT-OSS 120B", "FREE - Modelo aberto de 120B servido pela Groq"),
         ModelType.LLAMA_3_1_8B: ("Llama 3.1 8B", "FREE - Fast and efficient for simple tasks"),
         # DeepSeek
         ModelType.DEEPSEEK_CHAT: ("DeepSeek V3.2", "Best value - Cheap and capable (128K context)"),
@@ -324,4 +324,4 @@ async def get_available_models():
             output_price=pricing["output"]
         ))
 
-    return ModelsResponse(models=models, default_model="llama-3.3-70b-versatile")
+    return ModelsResponse(models=models, default_model="openai/gpt-oss-120b")

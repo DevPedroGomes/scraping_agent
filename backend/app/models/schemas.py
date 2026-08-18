@@ -17,7 +17,12 @@ class ModelProvider(str, Enum):
 class ModelType(str, Enum):
     """Available models across all providers."""
     # Groq (FREE - Open Source Models)
-    LLAMA_3_3_70B = "llama-3.3-70b-versatile"    # FREE - Best open source
+    # A Groq descomissionou `llama-3.3-70b-versatile` e a chamada passou a
+    # voltar 404 model_not_found: o modo gratuito do scraper ficou quebrado
+    # para todo visitante que tentava um scrape real. Nome de modelo de
+    # terceiro e contrato que muda sem aviso; por isso o catalogo agora e
+    # conferido contra /v1/models antes de publicar.
+    GPT_OSS_120B = "openai/gpt-oss-120b"    # FREE - servido pela Groq
     LLAMA_3_1_8B = "llama-3.1-8b-instant"        # FREE - Fast
 
     # DeepSeek (CHEAPEST - Best value)
@@ -50,7 +55,7 @@ class ModelType(str, Enum):
 # Model to Provider mapping
 MODEL_PROVIDER_MAP = {
     # Groq (FREE)
-    ModelType.LLAMA_3_3_70B: ModelProvider.GROQ,
+    ModelType.GPT_OSS_120B: ModelProvider.GROQ,
     ModelType.LLAMA_3_1_8B: ModelProvider.GROQ,
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: ModelProvider.DEEPSEEK,
@@ -76,7 +81,7 @@ MODEL_PROVIDER_MAP = {
 # Model context limits in characters (~4 chars per token)
 MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
     # Groq
-    ModelType.LLAMA_3_3_70B: 128_000 * 4,
+    ModelType.GPT_OSS_120B: 128_000 * 4,
     ModelType.LLAMA_3_1_8B: 128_000 * 4,
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: 128_000 * 4,
@@ -102,7 +107,7 @@ MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
 # Model pricing info (input/output per 1M tokens)
 MODEL_PRICING = {
     # Groq (FREE)
-    ModelType.LLAMA_3_3_70B: {"input": 0.00, "output": 0.00, "tier": "free"},
+    ModelType.GPT_OSS_120B: {"input": 0.00, "output": 0.00, "tier": "free"},
     ModelType.LLAMA_3_1_8B: {"input": 0.00, "output": 0.00, "tier": "free"},
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: {"input": 0.28, "output": 0.42, "tier": "budget"},
@@ -202,7 +207,7 @@ class ScrapeRequest(BaseModel):
         json_schema_extra={"example": "Extract the main heading and all paragraph texts"}
     )
     model: ModelType = Field(
-        default=ModelType.LLAMA_3_3_70B,
+        default=ModelType.GPT_OSS_120B,
         description="LLM model to use for extraction (default: Llama 3.3 70B - FREE)"
     )
 
@@ -260,7 +265,7 @@ class ScrapeRequest(BaseModel):
             "example": {
                 "url": "https://example.com",
                 "prompt": "Extract the main heading text",
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
                 "api_key": "sk-...",
                 "use_cache": True,
                 "stealth_mode": True,
@@ -356,7 +361,7 @@ class ScrapeResponse(BaseModel):
                 "error": None,
                 "execution_time": 2.35,
                 "timestamp": "2024-01-27T15:30:00Z",
-                "model_used": "llama-3.3-70b-versatile",
+                "model_used": "openai/gpt-oss-120b",
                 "provider_used": "groq",
                 "tokens_used": 1500,
                 "estimated_cost": 0.002,
@@ -451,14 +456,14 @@ class ModelInfo(BaseModel):
 class ModelsResponse(BaseModel):
     """Response listing available models."""
     models: list[ModelInfo] = Field(..., description="List of available models")
-    default_model: str = Field(default="llama-3.3-70b-versatile", description="Default recommended model")
+    default_model: str = Field(default="openai/gpt-oss-120b", description="Default recommended model")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "models": [
                     {
-                        "id": "llama-3.3-70b-versatile",
+                        "id": "openai/gpt-oss-120b",
                         "name": "Llama 3.3 70B",
                         "provider": "groq",
                         "description": "FREE - Best open source model, rivals GPT-4",
@@ -467,7 +472,7 @@ class ModelsResponse(BaseModel):
                         "output_price": 0.00
                     }
                 ],
-                "default_model": "llama-3.3-70b-versatile"
+                "default_model": "openai/gpt-oss-120b"
             }
         }
     )

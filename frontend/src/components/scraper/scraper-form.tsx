@@ -37,7 +37,7 @@ interface ScraperFormProps {
 export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
   const [url, setUrl] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<ModelType>("llama-3.3-70b-versatile");
+  const [model, setModel] = useState<ModelType>("openai/gpt-oss-120b");
   const [apiKey, setApiKey] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 

@@ -17,7 +17,7 @@ EXAMPLE_SCRAPES = [
         "name": "Hacker News - Top Stories",
         "url": "https://news.ycombinator.com",
         "prompt": "Extract the top 5 stories with their title, URL, score, and author",
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "cached_response": {
             "success": True,
             "data": {
@@ -30,7 +30,7 @@ EXAMPLE_SCRAPES = [
                 ]
             },
             "execution_time": 0.01,
-            "model_used": "llama-3.3-70b-versatile",
+            "model_used": "openai/gpt-oss-120b",
             "provider_used": "groq",
             "tokens_used": 850,
             "estimated_cost": 0.0,
@@ -49,7 +49,7 @@ EXAMPLE_SCRAPES = [
         "name": "GitHub Trending - Top Repos",
         "url": "https://github.com/trending",
         "prompt": "Extract the top 5 trending repositories with name, description, language, and stars today",
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "cached_response": {
             "success": True,
             "data": {
@@ -62,7 +62,7 @@ EXAMPLE_SCRAPES = [
                 ]
             },
             "execution_time": 0.01,
-            "model_used": "llama-3.3-70b-versatile",
+            "model_used": "openai/gpt-oss-120b",
             "provider_used": "groq",
             "tokens_used": 920,
             "estimated_cost": 0.0,
@@ -81,7 +81,7 @@ EXAMPLE_SCRAPES = [
         "name": "Product Hunt - Today's Top",
         "url": "https://www.producthunt.com",
         "prompt": "Extract the top 5 products launched today with name, tagline, and vote count",
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "cached_response": {
             "success": True,
             "data": {
@@ -94,7 +94,7 @@ EXAMPLE_SCRAPES = [
                 ]
             },
             "execution_time": 0.01,
-            "model_used": "llama-3.3-70b-versatile",
+            "model_used": "openai/gpt-oss-120b",
             "provider_used": "groq",
             "tokens_used": 780,
             "estimated_cost": 0.0,

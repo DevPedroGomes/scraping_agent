@@ -14,10 +14,10 @@ import type {
 // Fallback models in case API is unreachable
 const FALLBACK_MODELS: Model[] = [
   {
-    id: "llama-3.3-70b-versatile",
-    name: "Llama 3.3 70B",
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
     provider: "groq",
-    description: "FREE - Best open source model, rivals GPT-4",
+    description: "FREE - Modelo aberto de 120B servido pela Groq",
     tier: "free",
     input_price: 0.00,
     output_price: 0.00
