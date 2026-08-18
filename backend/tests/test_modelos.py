@@ -11,7 +11,7 @@ rede: prende o que da para prender offline, que e a coerencia interna do
 catalogo e a ausencia dos nomes ja mortos.
 """
 
-from app.models.schemas import ModelType, MODEL_PROVIDER, MODEL_PRICING
+from app.models.schemas import ModelType, MODEL_PROVIDER_MAP, MODEL_PRICING, MODEL_CONTEXT_LIMITS
 
 
 MODELOS_DESCOMISSIONADOS = {
@@ -31,5 +31,6 @@ def test_todo_modelo_tem_provider_e_preco():
     # Modelo declarado sem provider vira KeyError na escolha do cliente, e sem
     # preco a estimativa de custo mostrada ao visitante mente.
     for m in ModelType:
-        assert m in MODEL_PROVIDER, f"{m.value} sem provider"
+        assert m in MODEL_PROVIDER_MAP, f"{m.value} sem provider"
         assert m in MODEL_PRICING, f"{m.value} sem preco"
+        assert m in MODEL_CONTEXT_LIMITS, f"{m.value} sem limite de contexto"
