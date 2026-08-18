@@ -17,6 +17,9 @@ from app.models.schemas import ModelType, MODEL_PROVIDER_MAP, MODEL_PRICING, MOD
 MODELOS_DESCOMISSIONADOS = {
     "llama-3.3-70b-versatile",   # Groq, saiu do catalogo em ago/2026
     "llama-3.1-70b-versatile",   # Groq, saiu antes
+    "llama-3.1-8b-instant",      # Groq, saiu junto com o 70b e passou batido
+                                 # na primeira correcao: a lista abaixo agora e
+                                 # conferida contra /v1/models a cada auditoria
     "mixtral-8x7b-32768",        # Groq, saiu antes
 }
 

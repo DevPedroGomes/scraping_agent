@@ -5,7 +5,7 @@ export type ModelProvider = "groq" | "openai" | "deepseek" | "gemini" | "anthrop
 export type ModelType =
   // Groq (FREE - Open Source Models)
   | "openai/gpt-oss-120b"
-  | "llama-3.1-8b-instant"
+  | "openai/gpt-oss-20b"
   // DeepSeek (Budget)
   | "deepseek-chat"
   // Gemini
@@ -145,7 +145,7 @@ export interface ExamplesResponse {
 export const MODEL_TO_PROVIDER: Record<ModelType, ModelProvider> = {
   // Groq (FREE)
   "openai/gpt-oss-120b": "groq",
-  "llama-3.1-8b-instant": "groq",
+  "openai/gpt-oss-20b": "groq",
   // DeepSeek
   "deepseek-chat": "deepseek",
   // Gemini

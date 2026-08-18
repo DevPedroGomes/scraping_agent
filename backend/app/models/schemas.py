@@ -23,7 +23,7 @@ class ModelType(str, Enum):
     # terceiro e contrato que muda sem aviso; por isso o catalogo agora e
     # conferido contra /v1/models antes de publicar.
     GPT_OSS_120B = "openai/gpt-oss-120b"    # FREE - servido pela Groq
-    LLAMA_3_1_8B = "llama-3.1-8b-instant"        # FREE - Fast
+    GPT_OSS_20B = "openai/gpt-oss-20b"        # FREE - Fast
 
     # DeepSeek (CHEAPEST - Best value)
     DEEPSEEK_CHAT = "deepseek-chat"          # $0.28/$0.42 per 1M tokens (DeepSeek-V3.2)
@@ -56,7 +56,7 @@ class ModelType(str, Enum):
 MODEL_PROVIDER_MAP = {
     # Groq (FREE)
     ModelType.GPT_OSS_120B: ModelProvider.GROQ,
-    ModelType.LLAMA_3_1_8B: ModelProvider.GROQ,
+    ModelType.GPT_OSS_20B: ModelProvider.GROQ,
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: ModelProvider.DEEPSEEK,
     # Gemini
@@ -82,7 +82,7 @@ MODEL_PROVIDER_MAP = {
 MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
     # Groq
     ModelType.GPT_OSS_120B: 128_000 * 4,
-    ModelType.LLAMA_3_1_8B: 128_000 * 4,
+    ModelType.GPT_OSS_20B: 128_000 * 4,
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: 128_000 * 4,
     # Gemini
@@ -108,7 +108,7 @@ MODEL_CONTEXT_LIMITS: dict[ModelType, int] = {
 MODEL_PRICING = {
     # Groq (FREE)
     ModelType.GPT_OSS_120B: {"input": 0.00, "output": 0.00, "tier": "free"},
-    ModelType.LLAMA_3_1_8B: {"input": 0.00, "output": 0.00, "tier": "free"},
+    ModelType.GPT_OSS_20B: {"input": 0.00, "output": 0.00, "tier": "free"},
     # DeepSeek
     ModelType.DEEPSEEK_CHAT: {"input": 0.28, "output": 0.42, "tier": "budget"},
     # Gemini

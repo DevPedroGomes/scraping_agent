@@ -116,7 +116,7 @@ class SmartRouter:
     TIER_MODELS = {
         CostTier.FREE: [
             ModelType.GPT_OSS_120B,
-            ModelType.LLAMA_3_1_8B,
+            ModelType.GPT_OSS_20B,
         ],
         CostTier.BUDGET: [
             ModelType.DEEPSEEK_CHAT,

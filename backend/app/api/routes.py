@@ -286,7 +286,7 @@ async def get_available_models():
     model_info = {
         # Groq (FREE - Open Source Models)
         ModelType.GPT_OSS_120B: ("GPT-OSS 120B", "FREE - Modelo aberto de 120B servido pela Groq"),
-        ModelType.LLAMA_3_1_8B: ("Llama 3.1 8B", "FREE - Fast and efficient for simple tasks"),
+        ModelType.GPT_OSS_20B: ("GPT-OSS 20B", "FREE - Rapido, para extracao simples"),
         # DeepSeek
         ModelType.DEEPSEEK_CHAT: ("DeepSeek V3.2", "Best value - Cheap and capable (128K context)"),
         # Gemini
