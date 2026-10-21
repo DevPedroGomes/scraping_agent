@@ -7,28 +7,65 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ScrapeResponse } from "@/types";
 import { PROVIDER_NAMES, type ModelProvider } from "@/types";
+import { useI18n } from "@/lib/i18n-context";
+import { describeError, describeValidationError, type UiError } from "@/lib/errors";
+import type { Translate } from "@/lib/i18n";
 
 interface ScraperResultProps {
   result: ScrapeResponse | null;
-  error: string | null;
+  error: UiError | null;
   onClear: () => void;
 }
 
+/**
+ * The seal says what actually happened to the JSON. `validation_passed` is null
+ * whenever no schema was sent: nothing checked the output, so the panel says
+ * "no schema validation" instead of letting the page's promise of validated
+ * JSON stand in for a check that never ran.
+ */
+function ValidationSeal({ result, t }: { result: ScrapeResponse; t: Translate }) {
+  if (result.validation_passed === true) {
+    return (
+      <Badge className="text-xs bg-emerald-600 text-white" data-validation="passed">
+        {t("validation.passed")}
+      </Badge>
+    );
+  }
+  if (result.validation_passed === false) {
+    return (
+      <Badge variant="destructive" className="text-xs" data-validation="failed">
+        {t("validation.failed")}
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="text-xs border-amber-300 bg-amber-50 text-amber-800"
+      title={t("validation.noneHint")}
+      data-validation="none"
+    >
+      {t("validation.none")}
+    </Badge>
+  );
+}
+
 export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
+  const { t } = useI18n();
   const [viewMode, setViewMode] = useState<"json" | "markdown">("json");
 
   if (!result && !error) {
     return (
       <Card className="border-border/50 h-full">
         <CardHeader className="pb-4">
-          <CardTitle className="text-xl">Result</CardTitle>
+          <CardTitle className="text-xl">{t("result.title")}</CardTitle>
           <CardDescription>
-            Extracted data will appear here
+            {t("result.emptyDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-            No results yet. Make a request to start.
+            {t("result.emptyBody")}
           </div>
         </CardContent>
       </Card>
@@ -41,17 +78,17 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-xl">Result</CardTitle>
-              <CardDescription>An error occurred</CardDescription>
+              <CardTitle className="text-xl">{t("result.title")}</CardTitle>
+              <CardDescription>{t("result.errorDesc")}</CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={onClear}>
-              Clear
+              {t("result.clear")}
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{describeError(error, t)}</AlertDescription>
           </Alert>
         </CardContent>
       </Card>
@@ -72,49 +109,50 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-xl flex items-center gap-2">
-              Result
+              {t("result.title")}
               <Badge variant={result.success ? "default" : "destructive"}>
-                {result.success ? "Success" : "Error"}
+                {result.success ? t("result.success") : t("result.error")}
               </Badge>
             </CardTitle>
             <CardDescription>
               {result.is_sample
-                ? "Pre-recorded sample, not a live scrape"
-                : `Executed in ${result.execution_time.toFixed(2)}s`}
-              {!result.is_sample && result.model_used && ` using ${result.model_used}`}
+                ? t("result.sampleDesc")
+                : t("result.executed", { seconds: result.execution_time.toFixed(2) })}
+              {!result.is_sample && result.model_used && t("result.using", { model: result.model_used })}
               {!result.is_sample && providerName && ` (${providerName})`}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={onClear}>
-            Clear
+            {t("result.clear")}
           </Button>
         </div>
 
         {/* Metadata badges */}
         <div className="flex flex-wrap gap-2 mt-3">
+          {result.success && <ValidationSeal result={result} t={t} />}
           {result.is_sample ? (
             <Badge variant="outline" className="text-xs">
-              Sample
+              {t("badge.sample")}
             </Badge>
           ) : result.cache_hit ? (
             <Badge variant="secondary" className="text-xs">
-              Cache Hit
+              {t("badge.cache")}
             </Badge>
           ) : null}
           {result.markdown_used && (
             <Badge variant="secondary" className="text-xs">
               Markdown
-              {result.token_reduction && ` (-${result.token_reduction.toFixed(0)}%)`}
+              {result.token_reduction ? ` (-${result.token_reduction.toFixed(0)}%)` : ""}
             </Badge>
           )}
           {result.content_truncated && (
             <Badge variant="destructive" className="text-xs">
-              Content Truncated
+              {t("badge.truncated")}
             </Badge>
           )}
-          {result.tokens_used && result.tokens_used > 0 && (
+          {result.tokens_used != null && result.tokens_used > 0 && (
             <Badge variant="outline" className="text-xs">
-              {result.tokens_used.toLocaleString()} tokens
+              {t("badge.tokens", { n: result.tokens_used.toLocaleString() })}
             </Badge>
           )}
           {result.estimated_cost !== undefined && result.estimated_cost !== null && result.estimated_cost > 0 && (
@@ -124,31 +162,25 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
           )}
           {result.actions_executed > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {result.actions_executed} action{result.actions_executed > 1 ? "s" : ""} executed
-            </Badge>
-          )}
-          {result.validation_passed !== null && result.validation_passed !== undefined && (
-            <Badge
-              variant={result.validation_passed ? "default" : "destructive"}
-              className="text-xs"
-            >
-              {result.validation_passed ? "Schema Valid" : "Schema Invalid"}
+              {result.actions_executed === 1
+                ? t("badge.actions.one")
+                : t("badge.actions.other", { n: result.actions_executed })}
             </Badge>
           )}
           {/* Timing breakdown */}
           {result.fetch_time != null && (
             <Badge variant="outline" className="text-xs">
-              Fetch: {result.fetch_time.toFixed(2)}s
+              {t("badge.fetch", { s: result.fetch_time.toFixed(2) })}
             </Badge>
           )}
           {result.parse_time != null && (
             <Badge variant="outline" className="text-xs">
-              Parse: {result.parse_time.toFixed(2)}s
+              {t("badge.parse", { s: result.parse_time.toFixed(2) })}
             </Badge>
           )}
           {result.llm_time != null && (
             <Badge variant="outline" className="text-xs">
-              LLM: {result.llm_time.toFixed(2)}s
+              {t("badge.llm", { s: result.llm_time.toFixed(2) })}
             </Badge>
           )}
           {result.scrapes_remaining != null && (
@@ -156,7 +188,9 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
               variant={result.scrapes_remaining <= 1 ? "destructive" : "outline"}
               className="text-xs"
             >
-              {result.scrapes_remaining} scrape{result.scrapes_remaining !== 1 ? "s" : ""} left
+              {result.scrapes_remaining === 1
+                ? t("badge.left.one")
+                : t("badge.left.other", { n: result.scrapes_remaining })}
             </Badge>
           )}
         </div>
@@ -166,10 +200,10 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
         {result.validation_errors && result.validation_errors.length > 0 && (
           <Alert variant="destructive">
             <AlertDescription>
-              <div className="font-semibold mb-1">Validation Errors:</div>
+              <div className="font-semibold mb-1">{t("result.validationErrors")}</div>
               <ul className="list-disc list-inside text-sm">
                 {result.validation_errors.map((err, i) => (
-                  <li key={i}>{err}</li>
+                  <li key={i}>{describeValidationError(err, t)}</li>
                 ))}
               </ul>
             </AlertDescription>
@@ -188,7 +222,7 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
                   : "bg-muted/50 text-muted-foreground hover:bg-muted"
               }`}
             >
-              JSON Result
+              {t("result.viewJson")}
             </button>
             <button
               type="button"
@@ -199,15 +233,20 @@ export function ScraperResult({ result, error, onClear }: ScraperResultProps) {
                   : "bg-muted/50 text-muted-foreground hover:bg-muted"
               }`}
             >
-              Processed Content
+              {t("result.viewMarkdown")}
             </button>
           </div>
         )}
 
         {/* Main result */}
-        {result.error ? (
+        {!result.success ? (
           <Alert variant="destructive">
-            <AlertDescription>{result.error}</AlertDescription>
+            <AlertDescription>
+              {describeError(
+                { code: result.error_code ?? "unknown", message: result.error ?? "" },
+                t
+              )}
+            </AlertDescription>
           </Alert>
         ) : viewMode === "markdown" && result.markdown_content ? (
           <div className="bg-muted/50 rounded-lg p-4 overflow-auto max-h-[500px]">

@@ -12,6 +12,34 @@ import type {
 // public proxy network — only the frontend can reach it.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+/**
+ * Failure that carries what the UI needs to explain it in the visitor's
+ * language: the HTTP status, a machine-readable code and the API's own text
+ * (English) as the fallback message.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly body: unknown;
+
+  constructor(message: string, status: number, code: string, body: unknown = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.body = body;
+  }
+}
+
+function isScrapeFailureBody(body: unknown): body is ScrapeResponse {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { success?: unknown }).success === false &&
+    typeof (body as { error?: unknown }).error === "string"
+  );
+}
+
 class ApiClient {
   private sessionId: string | null = null;
 
@@ -44,13 +72,30 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Request failed: ${response.status}`);
+        const detail =
+          typeof errorData?.detail === "string" ? errorData.detail : `Request failed: ${response.status}`;
+        const code =
+          typeof errorData?.error_code === "string"
+            ? errorData.error_code
+            : response.status === 401
+              ? "session_expired"
+              : "unknown";
+        throw new ApiError(detail, response.status, code, errorData);
       }
 
       return response.json();
     } catch (error: unknown) {
+      if (error instanceof ApiError) throw error;
       if (error instanceof DOMException && error.name === "AbortError") {
-        throw new Error("Request timed out after 5 minutes. Please try again or use a simpler query.");
+        throw new ApiError(
+          "Request timed out after 5 minutes. Please try again or use a simpler query.",
+          0,
+          "client_timeout"
+        );
+      }
+      // fetch() rejects with a TypeError when the network itself fails.
+      if (error instanceof TypeError) {
+        throw new ApiError(error.message, 0, "network");
       }
       throw error;
     } finally {
@@ -102,11 +147,24 @@ class ApiClient {
     this.clearSession();
   }
 
+  /**
+   * A failed scrape now arrives with a 4xx/5xx status (it used to be HTTP 200
+   * with success=false). Its body is still a ScrapeResponse, so it is returned
+   * as one and rendered by the result panel exactly like before; only failures
+   * without that body (expired session, network) throw.
+   */
   async scrape(request: ScrapeRequest): Promise<ScrapeResponse> {
-    return this.request<ScrapeResponse>("/api/v1/scrape", {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
+    try {
+      return await this.request<ScrapeResponse>("/api/v1/scrape", {
+        method: "POST",
+        body: JSON.stringify(request),
+      });
+    } catch (error) {
+      if (error instanceof ApiError && isScrapeFailureBody(error.body)) {
+        return error.body;
+      }
+      throw error;
+    }
   }
 
   async getModels(): Promise<ModelsResponse> {

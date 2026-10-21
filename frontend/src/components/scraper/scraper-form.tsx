@@ -26,7 +26,8 @@ import type {
   OutputField,
   ActionType,
 } from "@/types";
-import { MODEL_TO_PROVIDER, PROVIDER_API_KEY_LABELS, PROVIDER_NAMES } from "@/types";
+import { MODEL_TO_PROVIDER, PROVIDER_KEY_VENDORS, PROVIDER_NAMES } from "@/types";
+import { useI18n } from "@/lib/i18n-context";
 
 interface ScraperFormProps {
   models: Model[];
@@ -35,13 +36,15 @@ interface ScraperFormProps {
 }
 
 export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
+  const { t, tOr } = useI18n();
   const [url, setUrl] = useState("");
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<ModelType>("openai/gpt-oss-120b");
   const [apiKey, setApiKey] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // New options
+  // New options. `stealth_mode` keeps its API name; what it toggles is a
+  // regular desktop browser profile (headers, viewport) for Playwright.
   const [stealthMode, setStealthMode] = useState(true);
   const [useMarkdown, setUseMarkdown] = useState(true);
   const [costTier, setCostTier] = useState<CostTier | "">("");
@@ -150,19 +153,19 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-4">
-        <CardTitle className="text-xl">Extract Data</CardTitle>
+        <CardTitle className="text-xl">{t("form.title")}</CardTitle>
         <CardDescription>
-          Enter the URL and describe what you want to extract
+          {t("form.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Model Selection */}
           <div className="space-y-2">
-            <Label htmlFor="model">AI Model</Label>
+            <Label htmlFor="model">{t("form.model")}</Label>
             <Select value={model} onValueChange={(v) => setModel(v as ModelType)}>
               <SelectTrigger id="model">
-                <SelectValue placeholder="Select a model" />
+                <SelectValue placeholder={t("form.modelPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {providerOrder.map((provider) => {
@@ -172,7 +175,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                   return (
                     <SelectGroup key={provider}>
                       <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground">
-                        {PROVIDER_NAMES[provider]}
+                        {provider === "groq" ? t("provider.groq") : PROVIDER_NAMES[provider]}
                       </SelectLabel>
                       {providerModels.map((m) => (
                         <SelectItem key={m.id} value={m.id}>
@@ -193,7 +196,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                               }
                               className="text-[10px] px-1"
                             >
-                              {m.tier}
+                              {t(`tier.${m.tier}`)}
                             </Badge>
                           </span>
                         </SelectItem>
@@ -205,7 +208,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             </Select>
             {selectedModel && (
               <p className="text-xs text-muted-foreground">
-                {selectedModel.description}
+                {tOr(`model.${selectedModel.id}`, selectedModel.description)}
               </p>
             )}
           </div>
@@ -215,29 +218,31 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             <div className="space-y-2">
               <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
                 <p className="text-sm font-medium text-emerald-800">
-                  ✓ Free showcase mode, using a shared Groq key
+                  {t("form.shared.title")}
                 </p>
+                {/* The session limit applies to every key, so this no longer
+                    promises "unlimited use" with your own key. */}
                 <p className="text-xs text-emerald-700 mt-1">
-                  No key needed; rate-limited per IP. Paste your own free Groq
-                  key below for unlimited use ({" "}
+                  {t("form.shared.body")} (
                   <a
                     href="https://console.groq.com/keys"
                     target="_blank"
                     rel="noreferrer noopener"
                     className="underline"
                   >
-                    get one in 30s
+                    {t("form.shared.link")}
                   </a>
                   ).
                 </p>
               </div>
               <Label htmlFor="api-key" className="text-xs text-muted-foreground">
-                Optional: your own Groq API key
+                {t("form.ownKeyLabel")}
               </Label>
               <Input
                 id="api-key"
                 type="password"
-                placeholder="gsk_... (leave blank to use shared free mode)"
+                autoComplete="off"
+                placeholder={t("form.ownKeyPlaceholder")}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="font-mono text-sm"
@@ -246,28 +251,29 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
           ) : (
             <div className="space-y-2">
               <Label htmlFor="api-key">
-                {PROVIDER_API_KEY_LABELS[currentProvider]}
+                {t("form.keyLabel", { provider: PROVIDER_KEY_VENDORS[currentProvider] })}
                 <span className="ml-1 rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
-                  BYOK required
+                  {t("form.byokRequired")}
                 </span>
               </Label>
               <Input
                 id="api-key"
                 type="password"
-                placeholder={currentProvider === "openai" ? "sk-..." : "Enter API key..."}
+                autoComplete="off"
+                placeholder={currentProvider === "openai" ? "sk-..." : t("form.keyPlaceholder")}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="font-mono text-sm"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Paid models need your own key. Not stored, used only for this request. Pick a Groq model above for the free shared mode.
+                {t("form.byokHint")}
               </p>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="url">Website URL</Label>
+            <Label htmlFor="url">{t("form.url")}</Label>
             <Input
               id="url"
               type="url"
@@ -279,10 +285,10 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="prompt">What do you want to extract?</Label>
+            <Label htmlFor="prompt">{t("form.prompt")}</Label>
             <Textarea
               id="prompt"
-              placeholder="E.g., Extract all article titles and their summaries..."
+              placeholder={t("form.promptPlaceholder")}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={3}
@@ -301,7 +307,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                 className="rounded"
               />
               <Label htmlFor="stealth-mode" className="text-sm font-normal cursor-pointer">
-                Stealth Mode
+                {t("form.opt.profile")}
               </Label>
             </div>
             <div className="flex items-center gap-2">
@@ -313,7 +319,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                 className="rounded"
               />
               <Label htmlFor="use-markdown" className="text-sm font-normal cursor-pointer">
-                Markdown (~67% cheaper)
+                {t("form.opt.markdown")}
               </Label>
             </div>
             <div className="flex items-center gap-2">
@@ -325,7 +331,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                 className="rounded"
               />
               <Label htmlFor="use-cache" className="text-sm font-normal cursor-pointer">
-                Use Cache
+                {t("form.opt.cache")}
               </Label>
             </div>
           </div>
@@ -336,10 +342,10 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-sm text-primary hover:underline flex items-center gap-1"
           >
-            {showAdvanced ? "Hide" : "Show"} Advanced Options
+            {showAdvanced ? t("form.advanced.hide") : t("form.advanced.show")}
             <span className="text-xs">
               {(actions.length > 0 || outputFields.length > 0) &&
-                `(${actions.length} actions, ${outputFields.length} fields)`}
+                t("form.advanced.count", { actions: actions.length, fields: outputFields.length })}
             </span>
           </button>
 
@@ -347,7 +353,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             <div className="space-y-6 pt-4 border-t border-border/50">
               {/* Smart Routing by Cost Tier */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Smart Routing (auto-select model)</Label>
+                <Label className="text-sm font-semibold">{t("form.routing.label")}</Label>
                 <Select
                   // Radix Select rejects empty string as a value (used internally
                   // to represent "no selection"). Map our "" sentinel to the
@@ -359,23 +365,23 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Use selected model above" />
+                    <SelectValue placeholder={t("form.routing.placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="use-selected">Use selected model</SelectItem>
-                    <SelectItem value="free">Free (Groq open source)</SelectItem>
-                    <SelectItem value="budget">Budget (cheapest)</SelectItem>
-                    <SelectItem value="standard">Standard (balanced)</SelectItem>
-                    <SelectItem value="premium">Premium (best quality)</SelectItem>
+                    <SelectItem value="use-selected">{t("form.routing.selected")}</SelectItem>
+                    <SelectItem value="free">{t("form.routing.free")}</SelectItem>
+                    <SelectItem value="budget">{t("form.routing.budget")}</SelectItem>
+                    <SelectItem value="standard">{t("form.routing.standard")}</SelectItem>
+                    <SelectItem value="premium">{t("form.routing.premium")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Page Actions */}
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">Page Actions (before scraping)</Label>
+                <Label className="text-sm font-semibold">{t("form.actions.label")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Execute actions like clicking buttons or scrolling before extracting data
+                  {t("form.actions.hint")}
                 </p>
 
                 {actions.length > 0 && (
@@ -385,7 +391,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                         key={index}
                         className="flex items-center gap-2 text-sm bg-muted/50 p-2 rounded"
                       >
-                        <Badge variant="outline">{action.action}</Badge>
+                        <Badge variant="outline">{t(`action.${action.action}`)}</Badge>
                         {action.selector && (
                           <code className="text-xs bg-background px-1 rounded">
                             {action.selector}
@@ -399,7 +405,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                           onClick={() => removeAction(index)}
                           className="ml-auto text-destructive hover:underline text-xs"
                         >
-                          Remove
+                          {t("form.remove")}
                         </button>
                       </div>
                     ))}
@@ -417,14 +423,14 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="click">Click</SelectItem>
-                      <SelectItem value="scroll">Scroll</SelectItem>
-                      <SelectItem value="wait">Wait</SelectItem>
-                      <SelectItem value="type">Type</SelectItem>
+                      <SelectItem value="click">{t("action.click")}</SelectItem>
+                      <SelectItem value="scroll">{t("action.scroll")}</SelectItem>
+                      <SelectItem value="wait">{t("action.wait")}</SelectItem>
+                      <SelectItem value="type">{t("action.type")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <Input
-                    placeholder="CSS selector"
+                    placeholder={t("form.selector")}
                     value={newAction.selector || ""}
                     onChange={(e) =>
                       setNewAction({ ...newAction, selector: e.target.value })
@@ -432,7 +438,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                     className="text-xs"
                   />
                   <Input
-                    placeholder={newAction.action === "scroll" ? "down/up" : "value"}
+                    placeholder={newAction.action === "scroll" ? "down/up" : t("form.value")}
                     value={newAction.value || ""}
                     onChange={(e) =>
                       setNewAction({ ...newAction, value: e.target.value })
@@ -440,16 +446,16 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                     className="text-xs"
                   />
                   <Button type="button" variant="outline" size="sm" onClick={addAction}>
-                    Add
+                    {t("form.add")}
                   </Button>
                 </div>
               </div>
 
               {/* Output Schema */}
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">Output Schema (structured output)</Label>
+                <Label className="text-sm font-semibold">{t("form.schema.label")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Define expected fields to ensure consistent, validated output
+                  {t("form.schema.hint")}
                 </p>
 
                 {outputFields.length > 0 && (
@@ -465,7 +471,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                         </Badge>
                         {field.required && (
                           <Badge variant="destructive" className="text-xs">
-                            required
+                            {t("form.field.required")}
                           </Badge>
                         )}
                         {field.description && (
@@ -478,7 +484,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                           onClick={() => removeField(index)}
                           className="ml-auto text-destructive hover:underline text-xs"
                         >
-                          Remove
+                          {t("form.remove")}
                         </button>
                       </div>
                     ))}
@@ -487,7 +493,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
                   <Input
-                    placeholder="Field name"
+                    placeholder={t("form.field.name")}
                     value={newField.name}
                     onChange={(e) => setNewField({ ...newField, name: e.target.value })}
                     className="text-xs"
@@ -513,7 +519,7 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                     </SelectContent>
                   </Select>
                   <Input
-                    placeholder="Description"
+                    placeholder={t("form.field.desc")}
                     value={newField.description || ""}
                     onChange={(e) =>
                       setNewField({ ...newField, description: e.target.value })
@@ -529,10 +535,10 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
                       }
                       className="rounded"
                     />
-                    <span className="text-xs">Req</span>
+                    <span className="text-xs">{t("form.field.req")}</span>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={addField}>
-                    Add
+                    {t("form.add")}
                   </Button>
                 </div>
               </div>
@@ -547,10 +553,10 @@ export function ScraperForm({ models, isLoading, onSubmit }: ScraperFormProps) {
             {isLoading ? (
               <span className="flex items-center gap-2">
                 <LoadingSpinner />
-                Extracting data...
+                {t("form.submitting")}
               </span>
             ) : (
-              "Start Scraping"
+              t("form.submit")
             )}
           </Button>
         </form>
