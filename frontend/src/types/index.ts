@@ -74,6 +74,8 @@ export interface ScrapeResponse {
   success: boolean;
   data: unknown;
   error?: string;
+  // Motivo da falha legivel por maquina; a interface traduz por ele.
+  error_code?: string | null;
   execution_time: number;
   timestamp: string;
   // Model info
@@ -89,9 +91,10 @@ export interface ScrapeResponse {
   // Markdown info
   markdown_used: boolean;
   token_reduction?: number;
-  // Validation info
-  validation_passed?: boolean;
-  validation_errors?: string[];
+  // Validation info. null/undefined = no schema was sent, so NOTHING was
+  // validated; the UI must say so instead of implying the JSON was checked.
+  validation_passed?: boolean | null;
+  validation_errors?: string[] | null;
   // Actions info
   actions_executed: number;
   // Content truncation
@@ -167,9 +170,15 @@ export const MODEL_TO_PROVIDER: Record<ModelType, ModelProvider> = {
   "grok-4-0709": "grok",
 };
 
-// Provider display names
+// Counted from the map above, never typed by hand: the page once showed
+// "6 providers", "5 models" and a 16-model dropdown at the same time. A backend
+// test (tests/test_modelos.py) keeps this map equal to the API catalog.
+export const MODEL_COUNT = Object.keys(MODEL_TO_PROVIDER).length;
+export const PROVIDER_COUNT = new Set(Object.values(MODEL_TO_PROVIDER)).size;
+
+// Provider display names (the Groq label is translated in the UI)
 export const PROVIDER_NAMES: Record<ModelProvider, string> = {
-  groq: "Groq (FREE)",
+  groq: "Groq",
   openai: "OpenAI",
   deepseek: "DeepSeek",
   gemini: "Google Gemini",
@@ -177,12 +186,12 @@ export const PROVIDER_NAMES: Record<ModelProvider, string> = {
   grok: "xAI Grok",
 };
 
-// Provider API key labels
-export const PROVIDER_API_KEY_LABELS: Record<ModelProvider, string> = {
-  groq: "Groq API Key (FREE)",
-  openai: "OpenAI API Key",
-  deepseek: "DeepSeek API Key",
-  gemini: "Google AI API Key",
-  anthropic: "Anthropic API Key",
-  grok: "xAI API Key",
+// Who issues the key, for the "<vendor> API key" label
+export const PROVIDER_KEY_VENDORS: Record<ModelProvider, string> = {
+  groq: "Groq",
+  openai: "OpenAI",
+  deepseek: "DeepSeek",
+  gemini: "Google AI",
+  anthropic: "Anthropic",
+  grok: "xAI",
 };

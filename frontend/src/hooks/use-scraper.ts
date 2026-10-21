@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
+import type { UiError } from "@/lib/errors";
 import type {
   ScrapeRequest,
   ScrapeResponse,
@@ -17,7 +18,7 @@ const FALLBACK_MODELS: Model[] = [
     id: "openai/gpt-oss-120b",
     name: "GPT-OSS 120B",
     provider: "groq",
-    description: "FREE - Modelo aberto de 120B servido pela Groq",
+    description: "Free - 120B open-weight model served by Groq",
     tier: "free",
     input_price: 0.00,
     output_price: 0.00
@@ -63,7 +64,10 @@ const FALLBACK_MODELS: Model[] = [
 export function useScraper() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ScrapeResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Only failures WITHOUT a ScrapeResponse body land here (expired session,
+  // network, client timeout). A failed scrape lives in `result`, so the panel
+  // shows one message instead of the same error twice.
+  const [error, setError] = useState<UiError | null>(null);
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [models, setModels] = useState<Model[]>(FALLBACK_MODELS);
@@ -71,7 +75,8 @@ export function useScraper() {
   // Sem isto a falha ao abrir sessao so ia para o console: a tela ficava com
   // aparencia normal e o visitante so descobria ao clicar em Extract, recebendo
   // "Missing X-Session-Id header" — mensagem de API, nao de produto.
-  const [sessionError, setSessionError] = useState<string | null>(null);
+  // Holds an i18n key; the component translates it.
+  const [sessionError, setSessionError] = useState<"session.tooMany" | "session.failed" | null>(null);
 
   const refreshSession = useCallback(async () => {
     const sessionId = apiClient.getSessionId();
@@ -104,11 +109,7 @@ export function useScraper() {
       setSessionError(null);
     } catch (err) {
       const detail = err instanceof Error ? err.message : "";
-      setSessionError(
-        detail.includes("this IP")
-          ? "Too many demo sessions opened from your network in the last few minutes. Wait about ten minutes and reload."
-          : "Could not open a demo session right now. Reload the page in a moment."
-      );
+      setSessionError(detail.includes("this IP") ? "session.tooMany" : "session.failed");
       console.error("Failed to initialize session:", err);
     }
   }, []);
@@ -150,22 +151,27 @@ export function useScraper() {
       const response = await apiClient.scrape(request);
       setResult(response);
 
-      if (!response.success && response.error) {
-        setError(response.error);
-      }
-
       // Refresh session to get updated scrape counter
       await refreshSession();
 
       return response;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMessage);
+      if (err instanceof ApiError) {
+        setError({ code: err.code, message: err.message });
+        if (err.code === "session_expired") {
+          // The old id is useless now; open a fresh session so the next click
+          // works instead of failing the same way again.
+          apiClient.clearSession();
+          await initSession();
+        }
+      } else {
+        setError({ code: "unknown", message: err instanceof Error ? err.message : "" });
+      }
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [refreshSession]);
+  }, [refreshSession, initSession]);
 
   const clearResult = useCallback(() => {
     setResult(null);

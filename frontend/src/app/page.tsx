@@ -1,13 +1,20 @@
 "use client";
 
 import { Scraper } from "@/components/scraper";
-import { Globe, Code2, Cpu, FileJson, Shield, ShieldCheck, Lock, Database, Zap, KeyRound, ArrowRight } from "lucide-react";
-import { useLocale } from "@/hooks/use-locale";
-import { getTranslations } from "@/lib/i18n";
+import { Globe, Code2, Cpu, FileJson, Shield, ShieldCheck, Lock, KeyRound, ArrowRight } from "lucide-react";
+import { I18nProvider, useI18n } from "@/lib/i18n-context";
+import { MODEL_COUNT, PROVIDER_COUNT } from "@/types";
 
 export default function Home() {
-  const { locale, changeLocale } = useLocale();
-  const t = getTranslations(locale);
+  return (
+    <I18nProvider>
+      <HomeContent />
+    </I18nProvider>
+  );
+}
+
+function HomeContent() {
+  const { locale, changeLocale, t } = useI18n();
 
   const pipelineSteps = [
     {
@@ -42,19 +49,29 @@ export default function Home() {
       <header className="sticky top-0 z-50 w-full border-b border-neutral-200 bg-white/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto flex h-14 items-center px-6 sm:px-8">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-lg object-cover" />
+            {/* logo.png was a 1024px, 827 KB file for a 32px slot; it is now a
+                128px copy of the same image (~12 KB), so the image optimizer
+                adds nothing here. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt={t('nav.logoAlt')} width={32} height={32} className="h-8 w-8 rounded-lg object-cover" />
             <span className="font-semibold tracking-tight text-neutral-900">{t('nav.title')}</span>
           </div>
           <div className="ml-auto flex items-center gap-1 text-xs font-mono">
             <button
+              type="button"
               onClick={() => changeLocale('en')}
+              aria-pressed={locale === 'en'}
+              lang="en"
               className={`px-2 py-1 rounded transition-colors ${locale === 'en' ? 'text-neutral-900 font-semibold' : 'text-neutral-400 hover:text-neutral-600'}`}
             >
               EN
             </button>
             <span className="text-neutral-300">|</span>
             <button
+              type="button"
               onClick={() => changeLocale('pt')}
+              aria-pressed={locale === 'pt'}
+              lang="pt-BR"
               className={`px-2 py-1 rounded transition-colors ${locale === 'pt' ? 'text-neutral-900 font-semibold' : 'text-neutral-400 hover:text-neutral-600'}`}
             >
               PT
@@ -79,34 +96,34 @@ export default function Home() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-emerald-700">Production-ready · BYOK 6 providers</span>
+            <span className="text-emerald-700">{t('hero.badge', { providers: PROVIDER_COUNT })}</span>
           </div>
 
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tighter leading-[0.9] text-neutral-900 mb-6">
-            URL + a sentence
+            {t('hero.title1')}
             <br />
-            <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">becomes JSON.</span>
+            <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">{t('hero.title2')}</span>
           </h1>
 
           <p className="text-lg text-neutral-500 leading-relaxed max-w-2xl mx-auto mb-3">
             {t('hero.subtitle')}
           </p>
           <p className="text-sm text-neutral-400 font-mono max-w-xl mx-auto">
-            With actual SSRF defense, DNS-rebinding guards and prompt-injection isolation.
+            {t('hero.security')}
           </p>
 
           {/* Quick visual: URL → JSON */}
           <div className="mt-10 max-w-3xl mx-auto grid sm:grid-cols-3 items-center gap-3">
             <div className="bg-white border border-neutral-200 rounded-xl p-3 text-left text-xs font-mono">
-              <p className="text-[10px] text-neutral-400 uppercase mb-1">Input</p>
+              <p className="text-[10px] text-neutral-400 uppercase mb-1">{t('hero.input')}</p>
               <p className="text-neutral-700 truncate">https://news.ycombinator.com</p>
-              <p className="text-neutral-500 mt-1">&quot;top 5 story titles&quot;</p>
+              <p className="text-neutral-500 mt-1">{t('hero.samplePrompt')}</p>
             </div>
             <div className="hidden sm:flex justify-center">
               <ArrowRight className="h-5 w-5 text-neutral-300" />
             </div>
             <div className="bg-neutral-900 text-emerald-400 rounded-xl p-3 text-left text-xs font-mono shadow-lg">
-              <p className="text-[10px] text-neutral-500 uppercase mb-1">Output</p>
+              <p className="text-[10px] text-neutral-500 uppercase mb-1">{t('hero.output')}</p>
               <pre className="text-[10px] leading-relaxed overflow-hidden">{`[
   { "title": "Show HN: ..." },
   { "title": "Ask HN: ..." },
@@ -120,17 +137,17 @@ export default function Home() {
       {/* Security pillars */}
       <section className="max-w-6xl mx-auto px-6 sm:px-8 py-12">
         <div className="text-center mb-10">
-          <span className="text-xs uppercase tracking-widest text-neutral-400 font-mono">Engineered for production</span>
+          <span className="text-xs uppercase tracking-widest text-neutral-400 font-mono">{t('pillars.label')}</span>
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-neutral-900 mt-2">
-            What separates this from a 30-line script
+            {t('pillars.title')}
           </h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: ShieldCheck, label: "SSRF v2", desc: "IDNA + IPv6 unwrap + IP allowlist computed before the request, re-checked on every subresource." },
-            { icon: Shield,      label: "DNS-rebinding guard", desc: "Playwright route hooks intercept each subresource and abort if it leaves the allow-set." },
-            { icon: Lock,        label: "Prompt injection cage", desc: "Untrusted scraped content is wrapped in a system-prompt isolation layer before reaching the LLM." },
-            { icon: KeyRound,    label: "Per-key cache scoping", desc: "Cache key includes sha256 of API key, no cross-user leakage between BYOK sessions." },
+            { icon: ShieldCheck, label: t('pillars.ssrf.title'),      desc: t('pillars.ssrf.desc') },
+            { icon: Shield,      label: t('pillars.dns.title'),       desc: t('pillars.dns.desc') },
+            { icon: Lock,        label: t('pillars.injection.title'), desc: t('pillars.injection.desc') },
+            { icon: KeyRound,    label: t('pillars.cache.title'),     desc: t('pillars.cache.desc') },
           ].map((p) => (
             <div key={p.label} className="bg-white border border-neutral-200 rounded-2xl p-5 hover-lift">
               <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
@@ -170,9 +187,9 @@ export default function Home() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-neutral-400 font-mono">
             <span className="flex items-center gap-1.5">
               <Shield className="h-3.5 w-3.5" />
-              {t('tech.stealth')}
+              {t('tech.profile')}
             </span>
-            <span>{t('tech.models')}</span>
+            <span>{t('tech.models', { models: MODEL_COUNT, providers: PROVIDER_COUNT })}</span>
             <span>{t('tech.tokens')}</span>
             <span>{t('tech.rate')}</span>
           </div>
@@ -195,7 +212,7 @@ export default function Home() {
               <p className="text-sm text-neutral-500">
                 {t('footer.built')}{" "}
                 <span className="font-medium text-neutral-900">Next.js</span>,{" "}
-                <span className="font-medium text-neutral-900">FastAPI</span> and{" "}
+                <span className="font-medium text-neutral-900">FastAPI</span> {t('footer.and')}{" "}
                 <span className="font-medium text-neutral-900">Playwright</span>
               </p>
               <p className="text-xs text-neutral-400 font-mono">
@@ -205,7 +222,7 @@ export default function Home() {
             <div className="flex items-center gap-4 text-sm text-neutral-500">
               <a href="https://github.com/devpedrogomes" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">GitHub</a>
               <a href="https://www.linkedin.com/in/devpgomes" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">LinkedIn</a>
-              <a href="https://pgdev.com.br" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">Portfolio</a>
+              <a href="https://pgdev.com.br" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 transition-colors">{t('footer.portfolio')}</a>
             </div>
           </div>
         </footer>

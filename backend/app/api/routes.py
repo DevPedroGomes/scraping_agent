@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Header, Depends, Request
+from fastapi.responses import JSONResponse
 from typing import Annotated
 from app.models.schemas import (
     ScrapeRequest,
@@ -18,7 +19,7 @@ from app.core.session_manager import session_manager
 from app.core import daily_budget
 from app.core.config import get_settings
 from app.core.examples import get_examples_list, get_example_by_match
-from app.services.scraper_service import scraper_service
+from app.services.scraper_service import scraper_service, ERROR_HTTP_STATUS
 
 router = APIRouter()
 
@@ -51,6 +52,40 @@ async def get_session_id(
         )
 
     return x_session_id
+
+
+def _failure_response(
+    result: ScrapeResponse, headers: dict[str, str] | None = None
+) -> JSONResponse:
+    """Send a failed scrape with a status code that says it failed.
+
+    It used to go out as HTTP 200 with success=false, so anything trusting the
+    status (curl, monitoring, a fetch without a body check) read a refused
+    request as a success. The body keeps the ScrapeResponse shape the UI already
+    renders, plus FastAPI's conventional `detail` string for generic clients.
+    """
+    status = ERROR_HTTP_STATUS.get(result.error_code or "", 500)
+    body = result.model_dump(mode="json")
+    body["detail"] = result.error
+    return JSONResponse(status_code=status, content=body, headers=headers)
+
+
+def _scrape_refusal(
+    session_id: str,
+    error_code: str,
+    message: str,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    """Refusal decided by the route itself (limits), in the same body shape."""
+    scrape_count, max_scrapes = session_manager.get_scrape_info(session_id)
+    result = ScrapeResponse(
+        success=False,
+        error=message,
+        error_code=error_code,
+        execution_time=0.0,
+        scrapes_remaining=max(0, max_scrapes - scrape_count),
+    )
+    return _failure_response(result, headers)
 
 
 def _build_session_info(session_id: str) -> SessionInfo:
@@ -191,17 +226,31 @@ Extract structured data from any website using AI.
 **Rate Limit**: 10 requests per minute per session.
 **Scrape Limit**: 5 scrapes per session (examples don't count).
 
-**Providers**: Groq (FREE), OpenAI, DeepSeek, Gemini, Anthropic, Grok
+**Providers**: Groq (free shared key), OpenAI, DeepSeek, Gemini, Anthropic, xAI Grok
+
+**Failures** return a 4xx/5xx status with the ScrapeResponse body
+(`success: false`, `error`, `error_code`) plus a `detail` string.
     """,
     responses={
+        400: {"description": "invalid_url, api_key_required or provider_auth"},
+        403: {"description": "blocked_url (private, internal or metadata address)"},
         429: {
-            "description": "Rate limit or scrape limit exceeded",
+            "description": "rate_limited, scrape_limit_reached, provider_rate_limited or provider_quota",
             "content": {
                 "application/json": {
-                    "example": {"detail": "Request limit exceeded. Please wait a moment."}
+                    "example": {
+                        "success": False,
+                        "error": "Request limit exceeded. Please wait a moment.",
+                        "error_code": "rate_limited",
+                        "detail": "Request limit exceeded. Please wait a moment.",
+                    }
                 }
             }
         },
+        500: {"description": "internal_error (with a reference ID)"},
+        502: {"description": "provider_unavailable (the shared key was rejected)"},
+        503: {"description": "daily_limit_reached for the shared key"},
+        504: {"description": "site_timeout"},
     }
 )
 async def scrape_website(
@@ -210,9 +259,8 @@ async def scrape_website(
 ):
     """Scrape a website and extract data using AI."""
     if not session_manager.can_make_request(session_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Request limit exceeded. Please wait a moment."
+        return _scrape_refusal(
+            session_id, "rate_limited", "Request limit exceeded. Please wait a moment."
         )
 
     # Check if this matches a pre-cached example (doesn't count toward limits)
@@ -227,9 +275,10 @@ async def scrape_website(
 
     # Check scrape limit
     if not session_manager.can_scrape(session_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Scrape limit reached for this session. Examples are still available."
+        return _scrape_refusal(
+            session_id,
+            "scrape_limit_reached",
+            "Scrape limit reached for this session. Examples are still available.",
         )
 
     # Teto diario, so para quem usa a nossa chave compartilhada. Consumido
@@ -241,9 +290,10 @@ async def scrape_website(
             "scrape", get_settings().daily_shared_key_scrapes
         )
         if not allowed:
-            raise HTTPException(
-                status_code=503,
-                detail="Daily limit for the free shared key reached. Paste your own API key to keep going, or come back tomorrow.",
+            return _scrape_refusal(
+                session_id,
+                "daily_limit_reached",
+                "Daily limit for the free shared key reached. Paste your own API key to keep going, or come back tomorrow.",
                 headers={"Retry-After": str(daily_budget.seconds_until_utc_midnight())},
             )
 
@@ -270,6 +320,8 @@ async def scrape_website(
         scrape_count, max_scrapes = session_manager.get_scrape_info(session_id)
         result.scrapes_remaining = max_scrapes - scrape_count
 
+        if not result.success:
+            return _failure_response(result)
         return result
 
 
@@ -285,8 +337,8 @@ async def get_available_models():
 
     model_info = {
         # Groq (FREE - Open Source Models)
-        ModelType.GPT_OSS_120B: ("GPT-OSS 120B", "FREE - Modelo aberto de 120B servido pela Groq"),
-        ModelType.GPT_OSS_20B: ("GPT-OSS 20B", "FREE - Rapido, para extracao simples"),
+        ModelType.GPT_OSS_120B: ("GPT-OSS 120B", "Free - 120B open-weight model served by Groq"),
+        ModelType.GPT_OSS_20B: ("GPT-OSS 20B", "Free - Fast, for simple extractions"),
         # DeepSeek
         ModelType.DEEPSEEK_CHAT: ("DeepSeek V3.2", "Best value - Cheap and capable (128K context)"),
         # Gemini
