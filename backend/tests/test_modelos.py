@@ -37,3 +37,24 @@ def test_todo_modelo_tem_provider_e_preco():
         assert m in MODEL_PROVIDER_MAP, f"{m.value} sem provider"
         assert m in MODEL_PRICING, f"{m.value} sem preco"
         assert m in MODEL_CONTEXT_LIMITS, f"{m.value} sem limite de contexto"
+
+
+def test_catalogo_do_frontend_bate_com_o_backend():
+    # A pagina conta modelos e provedores a partir do MODEL_TO_PROVIDER do
+    # frontend. Ja houve selo dizendo "6 providers", chip dizendo "5 modelos" e
+    # dropdown com 16: tres numeros para a mesma coisa. Se o mapa do frontend
+    # divergir do catalogo servido pela API, o numero exibido volta a mentir.
+    import re
+    from pathlib import Path
+
+    types_ts = Path(__file__).resolve().parents[2] / "frontend" / "src" / "types" / "index.ts"
+    if not types_ts.exists():  # imagem do backend nao carrega o frontend
+        import pytest
+        pytest.skip("frontend fora deste checkout")
+
+    source = types_ts.read_text(encoding="utf-8")
+    block = source.split("MODEL_TO_PROVIDER", 1)[1].split("};", 1)[0]
+    pares = dict(re.findall(r'"([^"]+)":\s*"([^"]+)"', block))
+
+    esperado = {m.value: MODEL_PROVIDER_MAP[m].value for m in ModelType}
+    assert pares == esperado

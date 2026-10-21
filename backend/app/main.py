@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.core.config import get_settings
 from app.core.cache import SQLiteCache
 from app.api.routes import router
+from app.models.schemas import ModelProvider, ModelType
 
 
 @asynccontextmanager
@@ -25,19 +26,21 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    # Counted from the catalog, so the docs cannot drift from what the API
+    # actually serves.
     app = FastAPI(
         title=settings.app_name,
-        description="""
+        description=f"""
 AI Web Scraper API v3.0 - Multi-Provider LLM Extraction
 
 **Features**:
-- 5 AI Providers: OpenAI, DeepSeek, Gemini, Anthropic, Grok
-- 15+ AI Models with smart cost-tier routing
-- HTML to Markdown conversion (67% token reduction)
-- Playwright stealth mode (anti-bot detection)
+- {len(ModelProvider)} AI providers: Groq, OpenAI, DeepSeek, Gemini, Anthropic, xAI Grok
+- {len(ModelType)} models with optional cost-tier routing
+- HTML to Markdown conversion (fewer tokens sent to the model)
+- Headless Chromium with a realistic desktop browser profile
 - Page actions (click, scroll, wait, type)
-- Structured output validation
-- Intelligent caching
+- Output checked against a schema when you send one (validation_passed is null otherwise)
+- Per-key caching
         """,
         version="3.0.0",
         lifespan=lifespan,

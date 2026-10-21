@@ -208,7 +208,7 @@ class ScrapeRequest(BaseModel):
     )
     model: ModelType = Field(
         default=ModelType.GPT_OSS_120B,
-        description="LLM model to use for extraction (default: Llama 3.3 70B - FREE)"
+        description="LLM model to use for extraction (default: GPT-OSS 120B on Groq, free shared key)"
     )
 
     # API Keys per provider (user provides their own)
@@ -248,10 +248,12 @@ class ScrapeRequest(BaseModel):
         le=1440
     )
 
-    # Stealth mode
+    # Browser profile. The field keeps its historical name for API
+    # compatibility; what it toggles is a regular desktop Chromium profile
+    # (realistic headers, desktop viewport) instead of Playwright's defaults.
     stealth_mode: bool = Field(
         default=True,
-        description="Use stealth mode to avoid bot detection"
+        description="Render with a realistic desktop browser profile (headers, viewport) instead of Playwright defaults"
     )
 
     # Markdown conversion
@@ -280,6 +282,15 @@ class ScrapeResponse(BaseModel):
     success: bool = Field(..., description="Whether the scraping was successful")
     data: Any | None = Field(default=None, description="Extracted data from the website")
     error: str | None = Field(default=None, description="Error message if scraping failed")
+    error_code: str | None = Field(
+        default=None,
+        description=(
+            "Machine-readable failure reason (invalid_url, blocked_url, "
+            "api_key_required, provider_auth, provider_rate_limited, "
+            "provider_quota, site_timeout, rate_limited, scrape_limit_reached, "
+            "daily_limit_reached, internal_error). Null on success."
+        ),
+    )
     execution_time: float = Field(..., description="Time taken in seconds")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -317,7 +328,11 @@ class ScrapeResponse(BaseModel):
     # Validation info
     validation_passed: bool | None = Field(
         default=None,
-        description="Whether output matched the schema (null if no schema provided)"
+        description=(
+            "Whether output matched the schema. Null means NO validation ran "
+            "because no output_schema was provided; clients must not present "
+            "a null as validated."
+        )
     )
     validation_errors: list[str] | None = Field(
         default=None,
@@ -359,6 +374,7 @@ class ScrapeResponse(BaseModel):
                 "success": True,
                 "data": {"heading": "Example Domain"},
                 "error": None,
+                "error_code": None,
                 "execution_time": 2.35,
                 "timestamp": "2024-01-27T15:30:00Z",
                 "model_used": "openai/gpt-oss-120b",
@@ -464,9 +480,9 @@ class ModelsResponse(BaseModel):
                 "models": [
                     {
                         "id": "openai/gpt-oss-120b",
-                        "name": "Llama 3.3 70B",
+                        "name": "GPT-OSS 120B",
                         "provider": "groq",
-                        "description": "FREE - Best open source model, rivals GPT-4",
+                        "description": "Free - 120B open-weight model served by Groq",
                         "tier": "free",
                         "input_price": 0.00,
                         "output_price": 0.00
