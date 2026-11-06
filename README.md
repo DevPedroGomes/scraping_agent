@@ -187,7 +187,7 @@ Any literal `</untrusted_content>` in the scraped text is replaced with a space 
 
 | Provider | Models | Client | Endpoint |
 |---|---|---|---|
-| Groq | Llama 3.3 70B, Llama 3.1 8B | `openai.AsyncOpenAI` | `https://api.groq.com/openai/v1` |
+| Groq | GPT-OSS 120B, GPT-OSS 20B | `openai.AsyncOpenAI` | `https://api.groq.com/openai/v1` |
 | OpenAI | GPT-5 / 5 Mini / 5 Nano, GPT-4o / 4o Mini | `openai.AsyncOpenAI` | native |
 | Anthropic | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | `anthropic.AsyncAnthropic` | native |
 | Google | Gemini 2.5 Pro / Flash / Flash Lite | `google.generativeai` | native |
